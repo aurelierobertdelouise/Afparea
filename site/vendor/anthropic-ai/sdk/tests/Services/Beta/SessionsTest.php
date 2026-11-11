@@ -1,0 +1,147 @@
+<?php
+
+namespace Tests\Services\Beta;
+
+use Anthropic\Beta\AnthropicBeta;
+use Anthropic\Beta\BetaCurrency;
+use Anthropic\Beta\Sessions\BetaManagedAgentsDeletedSession;
+use Anthropic\Beta\Sessions\BetaManagedAgentsSession;
+use Anthropic\BidirectionalPageCursor;
+use Anthropic\Client;
+use Anthropic\Core\Util;
+use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * @internal
+ */
+#[CoversNothing]
+final class SessionsTest extends TestCase
+{
+    protected Client $client;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $testUrl = Util::getenv('TEST_API_BASE_URL') ?: 'http://127.0.0.1:4010';
+        $client = new Client(apiKey: 'my-anthropic-api-key', baseUrl: $testUrl);
+
+        $this->client = $client;
+    }
+
+    #[Test]
+    public function testCreate(): void
+    {
+        $result = $this->client->beta->sessions->create(
+            agent: 'agent_011CZkYpogX7uDKUyvBTophP',
+            environmentID: 'env_011CZkZ9X2dpNyB7HsEFoRfW',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(BetaManagedAgentsSession::class, $result);
+    }
+
+    #[Test]
+    public function testCreateWithOptionalParams(): void
+    {
+        $result = $this->client->beta->sessions->create(
+            agent: 'agent_011CZkYpogX7uDKUyvBTophP',
+            environmentID: 'env_011CZkZ9X2dpNyB7HsEFoRfW',
+            budget: [
+                'maxListCost' => ['amount' => '2500', 'currency' => BetaCurrency::USD],
+                'type' => 'limit',
+            ],
+            initialEvents: [
+                [
+                    'content' => [
+                        ['text' => 'Where is my order #1234?', 'type' => 'text'],
+                    ],
+                    'type' => 'user.message',
+                ],
+            ],
+            metadata: ['foo' => 'string'],
+            resources: [
+                [
+                    'fileID' => 'file_011CNha8iCJcU1wXNR6q4V8w',
+                    'type' => 'file',
+                    'mountPath' => '/uploads/receipt.pdf',
+                ],
+            ],
+            title: 'Order #1234 inquiry',
+            vaultIDs: ['string'],
+            betas: [AnthropicBeta::MESSAGE_BATCHES_2024_09_24],
+            workspaceID: 'wrkspc_011CZkZaBF1tNoB5wlCeusgy',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(BetaManagedAgentsSession::class, $result);
+    }
+
+    #[Test]
+    public function testRetrieve(): void
+    {
+        $result = $this->client->beta->sessions->retrieve(
+            'sesn_011CZkZAtmR3yMPDzynEDxu7',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(BetaManagedAgentsSession::class, $result);
+    }
+
+    #[Test]
+    public function testUpdate(): void
+    {
+        $result = $this->client->beta->sessions->update(
+            'sesn_011CZkZAtmR3yMPDzynEDxu7',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(BetaManagedAgentsSession::class, $result);
+    }
+
+    #[Test]
+    public function testList(): void
+    {
+        $page = $this->client->beta->sessions->list(
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']]
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(BidirectionalPageCursor::class, $page);
+
+        if ($item = $page->getItems()[0] ?? null) {
+            // @phpstan-ignore-next-line method.alreadyNarrowedType
+            $this->assertInstanceOf(BetaManagedAgentsSession::class, $item);
+        }
+    }
+
+    #[Test]
+    public function testDelete(): void
+    {
+        $result = $this->client->beta->sessions->delete(
+            'sesn_011CZkZAtmR3yMPDzynEDxu7',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(BetaManagedAgentsDeletedSession::class, $result);
+    }
+
+    #[Test]
+    public function testArchive(): void
+    {
+        $result = $this->client->beta->sessions->archive(
+            'sesn_011CZkZAtmR3yMPDzynEDxu7',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(BetaManagedAgentsSession::class, $result);
+    }
+}

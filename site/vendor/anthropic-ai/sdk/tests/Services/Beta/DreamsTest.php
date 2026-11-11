@@ -1,0 +1,113 @@
+<?php
+
+namespace Tests\Services\Beta;
+
+use Anthropic\Beta\AnthropicBeta;
+use Anthropic\Beta\Dreams\BetaDream;
+use Anthropic\Client;
+use Anthropic\Core\Util;
+use Anthropic\PageCursor;
+use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * @internal
+ */
+#[CoversNothing]
+final class DreamsTest extends TestCase
+{
+    protected Client $client;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $testUrl = Util::getenv('TEST_API_BASE_URL') ?: 'http://127.0.0.1:4010';
+        $client = new Client(apiKey: 'my-anthropic-api-key', baseUrl: $testUrl);
+
+        $this->client = $client;
+    }
+
+    #[Test]
+    public function testCreate(): void
+    {
+        $result = $this->client->beta->dreams->create(
+            inputs: [['memoryStoreID' => 'x', 'type' => 'memory_store']],
+            model: 'string',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(BetaDream::class, $result);
+    }
+
+    #[Test]
+    public function testCreateWithOptionalParams(): void
+    {
+        $result = $this->client->beta->dreams->create(
+            inputs: [['memoryStoreID' => 'x', 'type' => 'memory_store']],
+            model: 'string',
+            instructions: 'x',
+            outputBehavior: ['type' => 'create_new'],
+            betas: [AnthropicBeta::MESSAGE_BATCHES_2024_09_24],
+            workspaceID: 'wrkspc_011CZkZaBF1tNoB5wlCeusgy',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(BetaDream::class, $result);
+    }
+
+    #[Test]
+    public function testRetrieve(): void
+    {
+        $result = $this->client->beta->dreams->retrieve(
+            'dream_id',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']]
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(BetaDream::class, $result);
+    }
+
+    #[Test]
+    public function testList(): void
+    {
+        $page = $this->client->beta->dreams->list(
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']]
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(PageCursor::class, $page);
+
+        if ($item = $page->getItems()[0] ?? null) {
+            // @phpstan-ignore-next-line method.alreadyNarrowedType
+            $this->assertInstanceOf(BetaDream::class, $item);
+        }
+    }
+
+    #[Test]
+    public function testArchive(): void
+    {
+        $result = $this->client->beta->dreams->archive(
+            'dream_id',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']]
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(BetaDream::class, $result);
+    }
+
+    #[Test]
+    public function testCancel(): void
+    {
+        $result = $this->client->beta->dreams->cancel(
+            'dream_id',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']]
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(BetaDream::class, $result);
+    }
+}

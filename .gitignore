@@ -1,0 +1,5 @@
+# Configuration locale et fichiers déposés
+site/config.php
+site/data/uploads/*
+!site/data/uploads/.gitkeep
+node_modules/

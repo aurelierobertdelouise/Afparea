@@ -1,0 +1,174 @@
+<?php
+
+namespace Tests\Services\Beta\MemoryStores;
+
+use Anthropic\Beta\AnthropicBeta;
+use Anthropic\Beta\MemoryStores\Memories\ManagedAgentsDeletedMemory;
+use Anthropic\Beta\MemoryStores\Memories\ManagedAgentsMemory;
+use Anthropic\Beta\MemoryStores\Memories\ManagedAgentsMemoryView;
+use Anthropic\Client;
+use Anthropic\Core\Util;
+use Anthropic\PageCursor;
+use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * @internal
+ */
+#[CoversNothing]
+final class MemoriesTest extends TestCase
+{
+    protected Client $client;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $testUrl = Util::getenv('TEST_API_BASE_URL') ?: 'http://127.0.0.1:4010';
+        $client = new Client(apiKey: 'my-anthropic-api-key', baseUrl: $testUrl);
+
+        $this->client = $client;
+    }
+
+    #[Test]
+    public function testCreate(): void
+    {
+        $result = $this->client->beta->memoryStores->memories->create(
+            'memory_store_id',
+            content: 'content',
+            path: '/P',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(ManagedAgentsMemory::class, $result);
+    }
+
+    #[Test]
+    public function testCreateWithOptionalParams(): void
+    {
+        $result = $this->client->beta->memoryStores->memories->create(
+            'memory_store_id',
+            content: 'content',
+            path: '/P',
+            view: ManagedAgentsMemoryView::BASIC,
+            betas: [AnthropicBeta::MESSAGE_BATCHES_2024_09_24],
+            workspaceID: 'wrkspc_011CZkZaBF1tNoB5wlCeusgy',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(ManagedAgentsMemory::class, $result);
+    }
+
+    #[Test]
+    public function testRetrieve(): void
+    {
+        $result = $this->client->beta->memoryStores->memories->retrieve(
+            'memory_id',
+            memoryStoreID: 'memory_store_id',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(ManagedAgentsMemory::class, $result);
+    }
+
+    #[Test]
+    public function testRetrieveWithOptionalParams(): void
+    {
+        $result = $this->client->beta->memoryStores->memories->retrieve(
+            'memory_id',
+            memoryStoreID: 'memory_store_id',
+            view: ManagedAgentsMemoryView::BASIC,
+            betas: [AnthropicBeta::MESSAGE_BATCHES_2024_09_24],
+            workspaceID: 'wrkspc_011CZkZaBF1tNoB5wlCeusgy',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(ManagedAgentsMemory::class, $result);
+    }
+
+    #[Test]
+    public function testUpdate(): void
+    {
+        $result = $this->client->beta->memoryStores->memories->update(
+            'memory_id',
+            memoryStoreID: 'memory_store_id',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(ManagedAgentsMemory::class, $result);
+    }
+
+    #[Test]
+    public function testUpdateWithOptionalParams(): void
+    {
+        $result = $this->client->beta->memoryStores->memories->update(
+            'memory_id',
+            memoryStoreID: 'memory_store_id',
+            view: ManagedAgentsMemoryView::BASIC,
+            content: 'content',
+            path: '/P',
+            precondition: [
+                'type' => 'content_sha256',
+                'contentSha256' => '210b9798eb53baa4e69d31c1071cf03d212b8ad0ca30cf321e0ea82e120aac26',
+            ],
+            betas: [AnthropicBeta::MESSAGE_BATCHES_2024_09_24],
+            workspaceID: 'wrkspc_011CZkZaBF1tNoB5wlCeusgy',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(ManagedAgentsMemory::class, $result);
+    }
+
+    #[Test]
+    public function testList(): void
+    {
+        $page = $this->client->beta->memoryStores->memories->list(
+            'memory_store_id',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(PageCursor::class, $page);
+
+        if ($item = $page->getItems()[0] ?? null) {
+            // @phpstan-ignore-next-line method.alreadyNarrowedType
+            $this->assertNotNull($item);
+        }
+    }
+
+    #[Test]
+    public function testDelete(): void
+    {
+        $result = $this->client->beta->memoryStores->memories->delete(
+            'memory_id',
+            memoryStoreID: 'memory_store_id',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(ManagedAgentsDeletedMemory::class, $result);
+    }
+
+    #[Test]
+    public function testDeleteWithOptionalParams(): void
+    {
+        $result = $this->client->beta->memoryStores->memories->delete(
+            'memory_id',
+            memoryStoreID: 'memory_store_id',
+            expectedContentSha256: 'expected_content_sha256',
+            betas: [AnthropicBeta::MESSAGE_BATCHES_2024_09_24],
+            workspaceID: 'wrkspc_011CZkZaBF1tNoB5wlCeusgy',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(ManagedAgentsDeletedMemory::class, $result);
+    }
+}

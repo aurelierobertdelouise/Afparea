@@ -1,0 +1,17 @@
+# AFPAREA — réglages Apache
+# Fichiers qui ne doivent jamais être servis
+<FilesMatch "^(config(\.sample)?\.php|composer\.(json|lock)|\.htaccess)$">
+  Require all denied
+</FilesMatch>
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "same-origin"
+  Header always set Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+</IfModule>
+
+# La réponse de l'assistant est diffusée au fil de l'eau : pas de compression sur l'API
+<IfModule mod_setenvif.c>
+  SetEnvIf Request_URI "/api/index\.php" no-gzip=1
+</IfModule>

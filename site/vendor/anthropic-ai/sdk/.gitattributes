@@ -1,0 +1,17 @@
+*.php diff=php
+
+/.changelog                    export-ignore
+/.github                       export-ignore
+/bin                           export-ignore
+/scripts                       export-ignore
+/tests                         export-ignore
+
+/.gitattributes                export-ignore
+/.gitignore                    export-ignore
+/.php-cs-fixer.dist.php        export-ignore
+/.phpactor.json                export-ignore
+/.stats.yml                    export-ignore
+/.version-manifest.json        export-ignore
+/phpstan.dist.neon             export-ignore
+/phpunit.xml.dist              export-ignore
+/release-please-config.json    export-ignore

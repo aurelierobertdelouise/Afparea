@@ -1,0 +1,56 @@
+<?php
+
+namespace Anthropic;
+
+use Anthropic\Core\Concerns\SdkStream;
+use Anthropic\Core\Contracts\BaseStream;
+use Anthropic\Core\Conversion;
+use Anthropic\Core\Exceptions\APIStatusException;
+use Anthropic\Core\Util;
+
+/**
+ * @template TItem
+ *
+ * @implements BaseStream<TItem>
+ */
+final class SSEStream implements BaseStream
+{
+    /**
+     * @use SdkStream<array{event?: string|null, data?: string|null, id?: string|null, retry?: int|null}, TItem>
+     */
+    use SdkStream;
+
+    private function parsedGenerator(): \Generator
+    {
+        if (!$this->stream->valid()) {
+            return;
+        }
+
+        foreach ($this->stream as $row) {
+            switch ($row['event'] ?? null) {
+                case 'ping':
+                case null: break;
+
+                case 'error':
+                    if ($data = $row['data'] ?? '') {
+                        $json = json_decode($data, associative: true) ?? $data;
+
+                        throw APIStatusException::from(
+                            request: $this->request,
+                            response: $this->response,
+                            body: $json,
+                        );
+                    }
+
+                    break;
+
+                default:
+                    if ($data = $row['data'] ?? '') {
+                        $decoded = Util::decodeJson($data);
+
+                        yield Conversion::coerce($this->convert, value: $decoded);
+                    }
+            }
+        }
+    }
+}

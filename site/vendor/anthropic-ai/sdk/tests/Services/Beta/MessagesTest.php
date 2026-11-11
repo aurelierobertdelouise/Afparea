@@ -1,0 +1,257 @@
+<?php
+
+namespace Tests\Services\Beta;
+
+use Anthropic\Beta\AnthropicBeta;
+use Anthropic\Beta\Messages\BetaMessage;
+use Anthropic\Beta\Messages\BetaMessageTokensCount;
+use Anthropic\Beta\Messages\BetaThinkingPrefixMismatchBehavior;
+use Anthropic\Client;
+use Anthropic\Core\Util;
+use Anthropic\Messages\Model;
+use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * @internal
+ */
+#[CoversNothing]
+final class MessagesTest extends TestCase
+{
+    protected Client $client;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $testUrl = Util::getenv('TEST_API_BASE_URL') ?: 'http://127.0.0.1:4010';
+        $client = new Client(apiKey: 'my-anthropic-api-key', baseUrl: $testUrl);
+
+        $this->client = $client;
+    }
+
+    #[Test]
+    public function testCreate(): void
+    {
+        $result = $this->client->beta->messages->create(
+            maxTokens: 1024,
+            messages: [['content' => 'Hello, world', 'role' => 'user']],
+            model: Model::CLAUDE_OPUS_5_5,
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(BetaMessage::class, $result);
+    }
+
+    #[Test]
+    public function testCreateWithOptionalParams(): void
+    {
+        $result = $this->client->beta->messages->create(
+            maxTokens: 1024,
+            messages: [['content' => 'Hello, world', 'role' => 'user']],
+            model: Model::CLAUDE_OPUS_5_5,
+            cacheControl: ['type' => 'ephemeral', 'ttl' => '5m'],
+            compaction: ['type' => 'summarize', 'instructions' => 'instructions'],
+            container: [
+                'id' => 'id',
+                'skills' => [
+                    ['skillID' => 'pdf', 'type' => 'anthropic', 'version' => 'latest'],
+                ],
+            ],
+            contextManagement: [
+                'edits' => [
+                    [
+                        'type' => 'clear_tool_uses_20250919',
+                        'clearAtLeast' => ['type' => 'input_tokens', 'value' => 0],
+                        'clearToolInputs' => true,
+                        'excludeTools' => ['string'],
+                        'keep' => ['type' => 'tool_uses', 'value' => 0],
+                        'trigger' => ['type' => 'input_tokens', 'value' => 1],
+                    ],
+                ],
+            ],
+            diagnostics: ['previousMessageID' => 'previous_message_id'],
+            fallbackCreditToken: 'x',
+            fallbacks: 'default',
+            inferenceGeo: 'inference_geo',
+            mcpServers: [
+                [
+                    'name' => 'name',
+                    'type' => 'url',
+                    'url' => 'url',
+                    'authorizationToken' => 'authorization_token',
+                    'toolConfiguration' => [
+                        'allowedTools' => ['string'], 'enabled' => true,
+                    ],
+                ],
+            ],
+            metadata: ['userID' => '13803d75-b4b5-4c3e-b2a2-6f21399b021b'],
+            outputConfig: [
+                'effort' => 'low',
+                'format' => ['schema' => ['foo' => 'bar'], 'type' => 'json_schema'],
+                'taskBudget' => ['total' => 1024, 'type' => 'tokens', 'remaining' => 0],
+            ],
+            outputFormat: ['schema' => ['foo' => 'bar'], 'type' => 'json_schema'],
+            serviceTier: 'auto',
+            speed: 'standard',
+            stopSequences: ['string'],
+            system: [
+                [
+                    'text' => 'Today\'s date is 2024-06-01.',
+                    'type' => 'text',
+                    'cacheControl' => ['type' => 'ephemeral', 'ttl' => '5m'],
+                    'citations' => [
+                        [
+                            'citedText' => 'The grass is green. The sky is blue.',
+                            'documentIndex' => 0,
+                            'documentTitle' => 'x',
+                            'endCharIndex' => 0,
+                            'startCharIndex' => 0,
+                            'type' => 'char_location',
+                        ],
+                    ],
+                ],
+            ],
+            thinking: [
+                'type' => 'adaptive',
+                'blockBinding' => [
+                    'prefixMismatchBehavior' => BetaThinkingPrefixMismatchBehavior::ERROR,
+                ],
+                'display' => 'summarized',
+            ],
+            thread: ['type' => 'create'],
+            toolChoice: ['type' => 'auto', 'disableParallelToolUse' => true],
+            tools: [
+                [
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => ['location' => 'bar', 'unit' => 'bar'],
+                        'required' => ['location'],
+                    ],
+                    'name' => 'name',
+                    'allowedCallers' => ['direct'],
+                    'cacheControl' => ['type' => 'ephemeral', 'ttl' => '5m'],
+                    'deferLoading' => true,
+                    'description' => 'Get the current weather in a given location',
+                    'eagerInputStreaming' => true,
+                    'inputExamples' => [['foo' => 'bar']],
+                    'strict' => true,
+                    'type' => 'custom',
+                ],
+            ],
+            betas: [AnthropicBeta::MESSAGE_BATCHES_2024_09_24],
+            userProfileID: 'anthropic-user-profile-id',
+            workspaceID: 'wrkspc_011CZkZaBF1tNoB5wlCeusgy',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(BetaMessage::class, $result);
+    }
+
+    #[Test]
+    public function testCountTokens(): void
+    {
+        $result = $this->client->beta->messages->countTokens(
+            messages: [['content' => 'Hello, world', 'role' => 'user']],
+            model: Model::CLAUDE_OPUS_5_5,
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(BetaMessageTokensCount::class, $result);
+    }
+
+    #[Test]
+    public function testCountTokensWithOptionalParams(): void
+    {
+        $result = $this->client->beta->messages->countTokens(
+            messages: [['content' => 'Hello, world', 'role' => 'user']],
+            model: Model::CLAUDE_OPUS_5_5,
+            cacheControl: ['type' => 'ephemeral', 'ttl' => '5m'],
+            compaction: ['type' => 'summarize', 'instructions' => 'instructions'],
+            contextManagement: [
+                'edits' => [
+                    [
+                        'type' => 'clear_tool_uses_20250919',
+                        'clearAtLeast' => ['type' => 'input_tokens', 'value' => 0],
+                        'clearToolInputs' => true,
+                        'excludeTools' => ['string'],
+                        'keep' => ['type' => 'tool_uses', 'value' => 0],
+                        'trigger' => ['type' => 'input_tokens', 'value' => 1],
+                    ],
+                ],
+            ],
+            mcpServers: [
+                [
+                    'name' => 'name',
+                    'type' => 'url',
+                    'url' => 'url',
+                    'authorizationToken' => 'authorization_token',
+                    'toolConfiguration' => [
+                        'allowedTools' => ['string'], 'enabled' => true,
+                    ],
+                ],
+            ],
+            outputConfig: [
+                'effort' => 'low',
+                'format' => ['schema' => ['foo' => 'bar'], 'type' => 'json_schema'],
+                'taskBudget' => ['total' => 1024, 'type' => 'tokens', 'remaining' => 0],
+            ],
+            outputFormat: ['schema' => ['foo' => 'bar'], 'type' => 'json_schema'],
+            speed: 'standard',
+            system: [
+                [
+                    'text' => 'Today\'s date is 2024-06-01.',
+                    'type' => 'text',
+                    'cacheControl' => ['type' => 'ephemeral', 'ttl' => '5m'],
+                    'citations' => [
+                        [
+                            'citedText' => 'The grass is green. The sky is blue.',
+                            'documentIndex' => 0,
+                            'documentTitle' => 'x',
+                            'endCharIndex' => 0,
+                            'startCharIndex' => 0,
+                            'type' => 'char_location',
+                        ],
+                    ],
+                ],
+            ],
+            thinking: [
+                'type' => 'adaptive',
+                'blockBinding' => [
+                    'prefixMismatchBehavior' => BetaThinkingPrefixMismatchBehavior::ERROR,
+                ],
+                'display' => 'summarized',
+            ],
+            toolChoice: ['type' => 'auto', 'disableParallelToolUse' => true],
+            tools: [
+                [
+                    'inputSchema' => [
+                        'type' => 'object',
+                        'properties' => ['location' => 'bar', 'unit' => 'bar'],
+                        'required' => ['location'],
+                    ],
+                    'name' => 'name',
+                    'allowedCallers' => ['direct'],
+                    'cacheControl' => ['type' => 'ephemeral', 'ttl' => '5m'],
+                    'deferLoading' => true,
+                    'description' => 'Get the current weather in a given location',
+                    'eagerInputStreaming' => true,
+                    'inputExamples' => [['foo' => 'bar']],
+                    'strict' => true,
+                    'type' => 'custom',
+                ],
+            ],
+            betas: [AnthropicBeta::MESSAGE_BATCHES_2024_09_24],
+            userProfileID: 'anthropic-user-profile-id',
+            workspaceID: 'wrkspc_011CZkZaBF1tNoB5wlCeusgy',
+            requestOptions: ['extraQueryParams' => ['beta' => 'true']],
+        );
+
+        // @phpstan-ignore-next-line method.alreadyNarrowedType
+        $this->assertInstanceOf(BetaMessageTokensCount::class, $result);
+    }
+}

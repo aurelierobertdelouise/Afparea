@@ -1,0 +1,228 @@
+<?php
+
+namespace Tests\Services\Beta;
+
+use Anthropic\Client;
+use Anthropic\Core\Exceptions\WebhookException;
+use Anthropic\Core\Util;
+use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\TestCase;
+use StandardWebhooks\Webhook;
+
+/**
+ * @internal
+ */
+#[CoversNothing]
+final class WebhooksTest extends TestCase
+{
+    protected Client $client;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $testUrl = Util::getenv('TEST_API_BASE_URL') ?: 'http://127.0.0.1:4010';
+        $client = new Client(apiKey: 'my-anthropic-api-key', baseUrl: $testUrl);
+
+        $this->client = $client;
+    }
+
+    #[Test]
+    public function testParseUnverified(): void
+    {
+        $payload = '{"id":"whe_0f1e2d3c4b5a69788796a5b4c3d2e1f0","created_at":"2026-03-15T10:00:00Z","data":{"id":"sesn_011CZkZAtmR3yMPDzynEDxu7","organization_id":"org_011CZkZZAe0sMna4vkBdtrfx","type":"session.status_idled","workspace_id":"wrkspc_011CZkZaBF1tNoB5wlCeusgy"},"type":"event"}';
+        $this->client->beta->webhooks->parseUnverified($payload);
+        // unwrap successful if not error thrown, increment assertion count to avoid risky test warning
+        $this->addToAssertionCount(1);
+    }
+
+    #[Test]
+    public function testParseUnverifiedBadJSON(): void
+    {
+        $this->expectException(WebhookException::class);
+
+        $badPayload = 'not a json string';
+        $this->client->beta->webhooks->parseUnverified($badPayload);
+    }
+
+    #[Test]
+    public function testUnwrapWithoutHeaders(): void
+    {
+        $this->expectException(\ArgumentCountError::class);
+
+        $payload = '{"id":"whe_0f1e2d3c4b5a69788796a5b4c3d2e1f0","created_at":"2026-03-15T10:00:00Z","data":{"id":"sesn_011CZkZAtmR3yMPDzynEDxu7","organization_id":"org_011CZkZZAe0sMna4vkBdtrfx","type":"session.status_idled","workspace_id":"wrkspc_011CZkZaBF1tNoB5wlCeusgy"},"type":"event"}';
+        // @phpstan-ignore arguments.count
+        $this->client->beta->webhooks->unwrap($payload);
+    }
+
+    #[Test]
+    public function testUnwrapBadJSON(): void
+    {
+        $this->expectException(WebhookException::class);
+        $this->expectExceptionMessage('Error parsing webhook body');
+
+        $badPayload = 'not a json string';
+        $secret = 'whsec_c2VjcmV0Cg==';
+        $webhook = new Webhook($secret);
+        $messageId = '1';
+        $timestamp = time();
+        $signature = $webhook->sign($messageId, $timestamp, $badPayload);
+
+        /** @var array<string, list<string>> $headers */
+        $headers = [
+            'webhook-signature' => [$signature],
+            'webhook-id' => [$messageId],
+            'webhook-timestamp' => [(string) $timestamp],
+        ];
+        $this->client->beta->webhooks->unwrap($badPayload, $headers, $secret);
+    }
+
+    #[Test]
+    public function testUnwrapEmptySecret(): void
+    {
+        $this->expectException(WebhookException::class);
+        $this->expectExceptionMessage('Webhook key must not be null or empty in order to unwrap');
+
+        $payload = '{"id":"whe_0f1e2d3c4b5a69788796a5b4c3d2e1f0","created_at":"2026-03-15T10:00:00Z","data":{"id":"sesn_011CZkZAtmR3yMPDzynEDxu7","organization_id":"org_011CZkZZAe0sMna4vkBdtrfx","type":"session.status_idled","workspace_id":"wrkspc_011CZkZaBF1tNoB5wlCeusgy"},"type":"event"}';
+        $webhook = new Webhook('whsec_c2VjcmV0Cg==');
+        $messageId = '1';
+        $timestamp = time();
+        $signature = $webhook->sign($messageId, $timestamp, $payload);
+
+        /** @var array<string, list<string>> $headers */
+        $headers = [
+            'webhook-signature' => [$signature],
+            'webhook-id' => [$messageId],
+            'webhook-timestamp' => [(string) $timestamp],
+        ];
+        $this->client->beta->webhooks->unwrap($payload, $headers, '');
+    }
+
+    #[Test]
+    public function testUnwrapWithVerification(): void
+    {
+        $payload = '{"id":"whe_0f1e2d3c4b5a69788796a5b4c3d2e1f0","created_at":"2026-03-15T10:00:00Z","data":{"id":"sesn_011CZkZAtmR3yMPDzynEDxu7","organization_id":"org_011CZkZZAe0sMna4vkBdtrfx","type":"session.status_idled","workspace_id":"wrkspc_011CZkZaBF1tNoB5wlCeusgy"},"type":"event"}';
+        $secret = 'whsec_c2VjcmV0Cg==';
+        $webhook = new Webhook($secret);
+        $messageId = '1';
+        $timestamp = time();
+        $signature = $webhook->sign($messageId, $timestamp, $payload);
+
+        /** @var array<string, list<string>> $headers */
+        $headers = [
+            'webhook-signature' => [$signature],
+            'webhook-id' => [$messageId],
+            'webhook-timestamp' => [(string) $timestamp],
+        ];
+        $this->client->beta->webhooks->unwrap($payload, $headers, $secret);
+        // unwrap successful if not error thrown, increment assertion count to avoid risky test warning
+        $this->addToAssertionCount(1);
+    }
+
+    #[Test]
+    public function testUnwrapWithMixedCaseHeaders(): void
+    {
+        $payload = '{"id":"whe_0f1e2d3c4b5a69788796a5b4c3d2e1f0","created_at":"2026-03-15T10:00:00Z","data":{"id":"sesn_011CZkZAtmR3yMPDzynEDxu7","organization_id":"org_011CZkZZAe0sMna4vkBdtrfx","type":"session.status_idled","workspace_id":"wrkspc_011CZkZaBF1tNoB5wlCeusgy"},"type":"event"}';
+        $secret = 'whsec_c2VjcmV0Cg==';
+        $webhook = new Webhook($secret);
+        $messageId = '1';
+        $timestamp = time();
+        $signature = $webhook->sign($messageId, $timestamp, $payload);
+
+        /** @var array<string, list<string>> $headers */
+        $headers = [
+            'Webhook-Signature' => [$signature],
+            'Webhook-Id' => [$messageId],
+            'Webhook-Timestamp' => [(string) $timestamp],
+        ];
+        $this->client->beta->webhooks->unwrap($payload, $headers, $secret);
+        // unwrap successful if not error thrown, increment assertion count to avoid risky test warning
+        $this->addToAssertionCount(1);
+    }
+
+    #[Test]
+    public function testUnwrapWrongKey(): void
+    {
+        $this->expectException(WebhookException::class);
+
+        $payload = '{"id":"whe_0f1e2d3c4b5a69788796a5b4c3d2e1f0","created_at":"2026-03-15T10:00:00Z","data":{"id":"sesn_011CZkZAtmR3yMPDzynEDxu7","organization_id":"org_011CZkZZAe0sMna4vkBdtrfx","type":"session.status_idled","workspace_id":"wrkspc_011CZkZaBF1tNoB5wlCeusgy"},"type":"event"}';
+        $secret = 'whsec_c2VjcmV0Cg==';
+        $webhook = new Webhook($secret);
+        $messageId = '1';
+        $timestamp = time();
+        $signature = $webhook->sign($messageId, $timestamp, $payload);
+
+        /** @var array<string, list<string>> $headers */
+        $headers = [
+            'webhook-signature' => [$signature],
+            'webhook-id' => [$messageId],
+            'webhook-timestamp' => [(string) $timestamp],
+        ];
+        $wrongKey = 'whsec_aaaaaaaaaa';
+        $this->client->beta->webhooks->unwrap($payload, $headers, $wrongKey);
+    }
+
+    #[Test]
+    public function testUnwrapBadSignature(): void
+    {
+        $this->expectException(WebhookException::class);
+
+        $payload = '{"id":"whe_0f1e2d3c4b5a69788796a5b4c3d2e1f0","created_at":"2026-03-15T10:00:00Z","data":{"id":"sesn_011CZkZAtmR3yMPDzynEDxu7","organization_id":"org_011CZkZZAe0sMna4vkBdtrfx","type":"session.status_idled","workspace_id":"wrkspc_011CZkZaBF1tNoB5wlCeusgy"},"type":"event"}';
+        $secret = 'whsec_c2VjcmV0Cg==';
+        $webhook = new Webhook($secret);
+        $messageId = '1';
+        $timestamp = time();
+        $badSig = $webhook->sign($messageId, $timestamp, 'some other payload');
+
+        /** @var array<string, list<string>> $headers */
+        $headers = [
+            'webhook-signature' => [$badSig],
+            'webhook-id' => [$messageId],
+            'webhook-timestamp' => [(string) $timestamp],
+        ];
+        $this->client->beta->webhooks->unwrap($payload, $headers, $secret);
+    }
+
+    #[Test]
+    public function testUnwrapOldTimestamp(): void
+    {
+        $this->expectException(WebhookException::class);
+
+        $payload = '{"id":"whe_0f1e2d3c4b5a69788796a5b4c3d2e1f0","created_at":"2026-03-15T10:00:00Z","data":{"id":"sesn_011CZkZAtmR3yMPDzynEDxu7","organization_id":"org_011CZkZZAe0sMna4vkBdtrfx","type":"session.status_idled","workspace_id":"wrkspc_011CZkZaBF1tNoB5wlCeusgy"},"type":"event"}';
+        $secret = 'whsec_c2VjcmV0Cg==';
+        $webhook = new Webhook($secret);
+        $messageId = '1';
+        $timestamp = time();
+        $signature = $webhook->sign($messageId, $timestamp, $payload);
+
+        /** @var array<string, list<string>> $headers */
+        $headers = [
+            'webhook-signature' => [$signature],
+            'webhook-id' => [$messageId],
+            'webhook-timestamp' => ['5'],
+        ];
+        $this->client->beta->webhooks->unwrap($payload, $headers, $secret);
+    }
+
+    #[Test]
+    public function testUnwrapWrongMessageID(): void
+    {
+        $this->expectException(WebhookException::class);
+
+        $payload = '{"id":"whe_0f1e2d3c4b5a69788796a5b4c3d2e1f0","created_at":"2026-03-15T10:00:00Z","data":{"id":"sesn_011CZkZAtmR3yMPDzynEDxu7","organization_id":"org_011CZkZZAe0sMna4vkBdtrfx","type":"session.status_idled","workspace_id":"wrkspc_011CZkZaBF1tNoB5wlCeusgy"},"type":"event"}';
+        $secret = 'whsec_c2VjcmV0Cg==';
+        $webhook = new Webhook($secret);
+        $messageId = '1';
+        $timestamp = time();
+        $signature = $webhook->sign($messageId, $timestamp, $payload);
+
+        /** @var array<string, list<string>> $headers */
+        $headers = [
+            'webhook-signature' => [$signature],
+            'webhook-id' => ['wrong'],
+            'webhook-timestamp' => [(string) $timestamp],
+        ];
+        $this->client->beta->webhooks->unwrap($payload, $headers, $secret);
+    }
+}

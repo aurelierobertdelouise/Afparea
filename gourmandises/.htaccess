@@ -9,7 +9,7 @@ AddDefaultCharset UTF-8
 # RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 # Fichiers sensibles inaccessibles
-<FilesMatch "^(config(\.sample)?\.php|.*\.sqlite.*|.*\.md|\.git.*)$">
+<FilesMatch "^(config(\.sample)?\.php|.*\.sqlite.*|.*\.md|\.git.*|.*\.csv)$">
     Require all denied
 </FilesMatch>
 
@@ -17,7 +17,12 @@ AddDefaultCharset UTF-8
     AddType application/manifest+json .webmanifest
 </IfModule>
 
+<IfModule mod_mime.c>
+    AddType font/woff2 .woff2
+</IfModule>
+
 <IfModule mod_expires.c>
+    ExpiresByType font/woff2 "access plus 1 year"
     ExpiresActive On
     ExpiresByType image/jpeg "access plus 1 month"
     ExpiresByType image/png  "access plus 1 month"

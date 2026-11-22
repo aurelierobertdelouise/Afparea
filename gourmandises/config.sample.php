@@ -2,53 +2,75 @@
 /**
  * Gourmandises AFPAR — configuration
  * Copiez ce fichier en « config.php » puis adaptez les valeurs.
+ * Ne JAMAIS versionner config.php (il contient les clés Stripe).
  */
 return [
-    // Nom affiché dans l'application
     'app_name'     => 'Gourmandises AFPAR',
-    'app_baseline' => 'Pains & viennoiseries en ligne',
+    'app_baseline' => 'Pains & viennoiseries de la filière Boulangerie',
 
-    // URL de base (laisser vide si l'appli est à la racine du domaine,
-    // sinon par ex. '/gourmandises')
+    // URL publique complète (sans « / » final) — utilisée dans les e-mails et pour Stripe.
+    // Ex. : 'https://gourmandises.afpar.com' ou 'https://www.afpar.com/gourmandises'
+    'app_url'  => 'http://localhost:8000',
+    // Chemin de base si l'appli est dans un sous-dossier (ex. '/gourmandises'), sinon ''
     'base_url' => '',
 
     // ---- Base de données -------------------------------------------------
-    // 'sqlite' : aucune configuration, fichier créé dans data/ (idéal pour démarrer)
-    // 'mysql'  : base MySQL/MariaDB créée dans le panel LWS (recommandé en production)
+    // 'mysql' recommandé sur LWS ; 'sqlite' pour un test rapide.
     'db' => [
         'driver'   => 'sqlite',
         'sqlite'   => __DIR__ . '/data/gourmandises.sqlite',
-        'host'     => 'localhost',     // LWS : souvent « localhost » ou « 127.0.0.1 »
+        'host'     => 'localhost',
         'port'     => 3306,
         'name'     => 'nom_de_la_base',
         'user'     => 'utilisateur',
         'password' => 'mot_de_passe',
     ],
 
-    // ---- Back-office -----------------------------------------------------
-    // Identifiant + hash du mot de passe administrateur.
-    // Générer un hash : php -r "echo password_hash('VotreMotDePasse', PASSWORD_DEFAULT);"
-    // Le hash ci-dessous correspond à « gourmandises2026 » : À CHANGER !
-    'admin_user'          => 'admin',
-    'admin_password_hash' => '$2y$10$iFFb5r9DkQCrtXd/FdGGRe6zf.hMTRfkNVZem.uBZ9HwmUdjHzajm',
+    // ---- Accès (cahier des charges §5.1 et §6.1) ------------------------
+    // Seuls les e-mails de ces domaines peuvent se connecter.
+    'allowed_domains' => ['afpar.com'],
+    // Comptes automatiquement promus Administrateur à leur 1re connexion.
+    'admin_emails' => ['prenom.nom@afpar.com'],
+    // Code PIN envoyé par e-mail
+    'otp_length'        => 6,
+    'otp_ttl_minutes'   => 10,
+    'otp_max_attempts'  => 5,   // essais par code
+    'otp_max_per_hour'  => 5,   // envois par adresse et par heure
+    // UNIQUEMENT pour tester en local sans serveur mail : affiche le code à l'écran.
+    // Doit rester à false en production (contrôle DSI).
+    'otp_debug' => false,
 
-    // ---- Commande --------------------------------------------------------
-    'delivery_fee_cents'      => 250,   // frais de livraison (2,50 €)
-    'free_delivery_from_cents'=> 2000,  // livraison offerte dès 20 €
-    'min_order_cents'         => 300,   // commande minimum
-    'delivery_zip_codes'      => [],    // ex. ['97400','97490'] ; vide = toutes zones
-    'slots' => ['07:00 - 08:00', '08:00 - 09:00', '09:00 - 10:00', '11:30 - 12:30', '16:00 - 17:00', '17:00 - 18:00'],
-    'lead_days'  => 0,                  // délai minimal (jours) avant la date souhaitée
-    'max_days'   => 14,                 // horizon de commande
+    // ---- E-mails ---------------------------------------------------------
+    // Sur LWS, l'adresse d'expédition doit exister sur le domaine hébergé.
+    'mail_from'      => 'no-reply@afpar.com',
+    'mail_from_name' => 'Gourmandises AFPAR',
 
-    // Coordonnées du point de retrait (Click & Collect)
-    'shop_address' => 'AFPAR — Atelier boulangerie, La Réunion',
-    'shop_phone'   => '',
-    'shop_email'   => '',
+    // ---- Paiement Stripe (§5.4) -----------------------------------------
+    // Clés disponibles dans le tableau de bord Stripe > Développeurs > Clés API.
+    // Sans clé secrète, l'application fonctionne en MODE SIMULATION (pilote / démo).
+    'stripe_secret_key'     => '',  // sk_live_... ou sk_test_...
+    'stripe_webhook_secret' => '',  // whsec_... (webhook vers /stripe-webhook.php)
+    'currency' => 'eur',
 
-    // E-mail de notification des nouvelles commandes (vide = désactivé)
-    'notify_email' => '',
+    // ---- Quotas par commande (§5.2) — modifiables aussi par catégorie dans l'admin
+    // (valeurs utilisées à l'installation)
+    'quota_viennoiseries' => 10,
+    'quota_pains'         => 3,
 
-    // Fuseau horaire
+    // ---- Calendrier de production (§8 étape 1 : « J-1 à 12h ») -----------
+    'production_days' => [1, 2, 3, 4, 5],   // 1 = lundi … 7 = dimanche
+    'cutoff_days'     => 1,                 // commande au plus tard J-1…
+    'cutoff_time'     => '12:00',           // … avant 12h00
+    'max_days'        => 14,                // horizon de réservation
+    'closed_dates'    => [],                // ex. ['2026-12-25', '2027-01-01']
+    'slots'           => ['Matin (8h00 - 10h00)', 'Midi (12h00 - 13h30)'],
+
+    // ---- RGPD (§7) -------------------------------------------------------
+    'retention_months'   => 6,                    // purge des commandes
+    'pending_expiry_min' => 30,                   // commande non payée annulée après X min
+    'dpo_email'          => 'dpo@afpar.com',
+    'responsable_traitement' => 'AFPAR — Directeur d\'exploitation',
+    'hebergeur' => 'LWS (Ligne Web Services), 10 rue Penthièvre, 75008 Paris',
+
     'timezone' => 'Indian/Reunion',
 ];

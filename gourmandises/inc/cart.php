@@ -9,7 +9,7 @@ function cart_raw(): array
 
 function cart_set(int $id, int $qty): void
 {
-    $qty = max(0, min(99, $qty));
+    $qty = max(0, min(50, $qty));
     if ($qty === 0) {
         unset($_SESSION['cart'][$id]);
     } else {
@@ -32,7 +32,7 @@ function cart_count(): int
     return array_sum(cart_raw());
 }
 
-/** Lignes du panier avec prix à jour depuis la base. */
+/** Lignes du panier avec prix à jour depuis la base (produits retirés supprimés). */
 function cart_lines(): array
 {
     $raw = cart_raw();
@@ -41,40 +41,23 @@ function cart_lines(): array
     }
     $ids = array_map('intval', array_keys($raw));
     $in = implode(',', array_fill(0, count($ids), '?'));
-    $st = db()->prepare("SELECT * FROM produits WHERE actif = 1 AND id IN ($in)");
+    $st = db()->prepare("SELECT p.*, c.nom AS categorie, c.slug AS categorie_slug FROM produits p JOIN categories c ON c.id = p.categorie_id
+        WHERE p.actif = 1 AND p.id IN ($in) ORDER BY c.ordre, p.ordre");
     $st->execute($ids);
     $lines = [];
+    $seen = [];
     foreach ($st->fetchAll() as $p) {
         $q = (int) $raw[$p['id']];
-        $lines[] = [
-            'produit'  => $p,
-            'quantite' => $q,
-            'total'    => $q * (int) $p['prix_cents'],
-        ];
+        $seen[] = (int) $p['id'];
+        $lines[] = ['produit' => $p, 'quantite' => $q, 'total' => $q * (int) $p['prix_cents']];
     }
-    // Retire les produits devenus indisponibles
-    $valid = array_column(array_column($lines, 'produit'), 'id');
-    foreach ($ids as $id) {
-        if (!in_array($id, array_map('intval', $valid), true)) {
-            unset($_SESSION['cart'][$id]);
-        }
+    foreach (array_diff($ids, $seen) as $gone) {
+        unset($_SESSION['cart'][$gone]);
     }
     return $lines;
 }
 
-function cart_subtotal(array $lines): int
+function cart_total(array $lines): int
 {
     return array_sum(array_column($lines, 'total'));
-}
-
-function delivery_fee(int $subtotal, string $mode): int
-{
-    if ($mode !== 'livraison') {
-        return 0;
-    }
-    $free = (int) cfg('free_delivery_from_cents', 0);
-    if ($free > 0 && $subtotal >= $free) {
-        return 0;
-    }
-    return (int) cfg('delivery_fee_cents', 0);
 }

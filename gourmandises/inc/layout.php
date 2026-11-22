@@ -1,49 +1,40 @@
 <?php
 /** @var string $content */
+$u = current_user();
 $cartCount = cart_count();
 $current = $_GET['p'] ?? 'accueil';
-$currentCat = $_GET['c'] ?? '';
 ?><!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title><?= e(($title ?? '') ? $title . ' · ' : '') ?><?= e(cfg('app_name')) ?></title>
-    <meta name="description" content="<?= e(cfg('app_baseline')) ?> — commandez vos pains et viennoiseries, faites-vous livrer ou retirez en Click & Collect.">
-    <meta name="theme-color" content="#2F2E4E">
-    <link rel="icon" type="image/png" href="<?= e(asset('assets/img/favicon.png')) ?>">
-    <link rel="apple-touch-icon" href="<?= e(asset('assets/img/logo-afpar.png')) ?>">
-    <link rel="manifest" href="<?= e(asset('manifest.webmanifest')) ?>">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Pacifico&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= e(asset('assets/css/style.css')) ?>">
+<?php require __DIR__ . '/head.php'; ?>
 </head>
 <body>
+<a class="skip" href="#contenu">Aller au contenu</a>
+<?php if (!stripe_enabled()): ?>
+    <div class="demo-banner">Mode simulation : aucun paiement réel (clé Stripe non configurée)</div>
+<?php endif; ?>
 <header class="topbar">
     <div class="wrap topbar-in">
         <a class="brand" href="<?= e(url()) ?>">
-            <img src="<?= e(asset('assets/img/logo-afpar.png')) ?>" alt="Logo AFPAR" width="44" height="50">
-            <span>
-                <strong><?= e(cfg('app_name')) ?></strong>
-                <small><?= e(cfg('app_baseline')) ?></small>
-            </span>
+            <img src="<?= e(asset('assets/img/logo-afpar.png')) ?>" alt="AFPAR" width="44" height="50">
+            <span><strong><?= e(cfg('app_name')) ?></strong><small><?= e(cfg('app_baseline')) ?></small></span>
         </a>
+        <?php if ($u): ?>
         <nav class="mainnav" aria-label="Navigation principale">
-            <a href="<?= e(url()) ?>" class="<?= $current === 'accueil' ? 'on' : '' ?>">Accueil</a>
-            <?php foreach (categories() as $c): ?>
-                <a href="<?= e(url('categorie', ['c' => $c['slug']])) ?>" class="<?= $currentCat === $c['slug'] ? 'on' : '' ?>"><?= e($c['nom']) ?></a>
-            <?php endforeach; ?>
-            <a href="<?= e(url('suivi')) ?>" class="<?= $current === 'suivi' ? 'on' : '' ?>">Suivi</a>
+            <a href="<?= e(url()) ?>" class="<?= in_array($current, ['accueil', 'produit'], true) ? 'on' : '' ?>">Catalogue</a>
+            <a href="<?= e(url('mes-commandes')) ?>" class="<?= in_array($current, ['mes-commandes', 'commande'], true) ? 'on' : '' ?>">Mes commandes</a>
+            <a href="<?= e(url('profil')) ?>" class="<?= $current === 'profil' ? 'on' : '' ?>">Profil</a>
+            <?php if (is_staff()): ?><a href="<?= e(url('gestion')) ?>" class="staff">Gestion</a><?php endif; ?>
         </nav>
-        <a class="cartbtn" href="<?= e(url('panier')) ?>" aria-label="Panier">
-            <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6.2M10 21a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm9 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg>
+        <a class="cartbtn" href="<?= e(url('panier')) ?>" aria-label="Panier (<?= $cartCount ?> article<?= $cartCount > 1 ? 's' : '' ?>)">
+            <?= icon('cart') ?>
             <span class="badge" data-cart-count <?= $cartCount ? '' : 'hidden' ?>><?= $cartCount ?></span>
         </a>
+        <?php endif; ?>
     </div>
 </header>
 
-<main class="wrap main">
+<main class="wrap main" id="contenu">
     <?php foreach (flashes() as $f): ?>
         <div class="flash flash-<?= e($f['type']) ?>" role="status"><?= e($f['message']) ?></div>
     <?php endforeach; ?>
@@ -52,26 +43,32 @@ $currentCat = $_GET['c'] ?? '';
 
 <section class="trust">
     <div class="wrap trust-in">
-        <div><?= icon('truck') ?><span>Livraison</span></div>
-        <div><?= icon('shop') ?><span>Click &amp; Collect</span></div>
-        <div><?= icon('lock') ?><span>Paiement sécurisé</span></div>
+        <div><?= icon('truck') ?><span>Livré dans votre centre</span></div>
+        <div><?= icon('shop') ?><span>Retrait au point relais</span></div>
+        <div><?= icon('lock') ?><span>Paiement sécurisé Stripe</span></div>
     </div>
 </section>
 
 <footer class="footer">
     <div class="wrap footer-in">
-        <p><strong><?= e(cfg('app_name')) ?></strong> — une application pédagogique de l'AFPAR.</p>
-        <p><a href="<?= e(url('infos')) ?>">Infos pratiques</a> · <a href="<?= e(url('suivi')) ?>">Suivre ma commande</a> · <a href="<?= e(url('admin')) ?>">Espace équipe</a></p>
+        <img class="footer-logo" src="<?= e(asset('assets/img/logo-afpar-horizontal.png')) ?>" alt="AFPAR — Le chemin de votre réussite" width="200" height="104">
+        <p>Production pédagogique de la filière Boulangerie — CFPA de Saint-André.<br>Service réservé au personnel AFPAR.</p>
+        <p><a href="<?= e(url('mentions')) ?>">Mentions légales &amp; RGPD</a><?php if ($u): ?> · <a href="<?= e(url('deconnexion')) ?>">Déconnexion</a><?php endif; ?></p>
     </div>
 </footer>
 
+<?php if ($u): ?>
 <nav class="tabbar" aria-label="Navigation mobile">
-    <a href="<?= e(url()) ?>" class="<?= $current === 'accueil' ? 'on' : '' ?>"><?= icon('home') ?><span>Accueil</span></a>
-    <?php foreach (categories() as $c): ?>
-        <a href="<?= e(url('categorie', ['c' => $c['slug']])) ?>" class="<?= $currentCat === $c['slug'] ? 'on' : '' ?>"><?= icon($c['slug'] === 'pains' ? 'bread' : 'croissant') ?><span><?= e($c['nom']) ?></span></a>
-    <?php endforeach; ?>
-    <a href="<?= e(url('panier')) ?>" class="<?= in_array($current, ['panier', 'commande'], true) ? 'on' : '' ?>"><?= icon('cart') ?><span>Panier</span><b class="dot" data-cart-count <?= $cartCount ? '' : 'hidden' ?>><?= $cartCount ?></b></a>
+    <a href="<?= e(url()) ?>" class="<?= in_array($current, ['accueil', 'produit'], true) ? 'on' : '' ?>"><?= icon('home') ?><span>Catalogue</span></a>
+    <a href="<?= e(url('panier')) ?>" class="<?= in_array($current, ['panier', 'recapitulatif'], true) ? 'on' : '' ?>"><?= icon('cart') ?><span>Panier</span><b class="dot" data-cart-count <?= $cartCount ? '' : 'hidden' ?>><?= $cartCount ?></b></a>
+    <a href="<?= e(url('mes-commandes')) ?>" class="<?= in_array($current, ['mes-commandes', 'commande'], true) ? 'on' : '' ?>"><?= icon('list') ?><span>Commandes</span></a>
+    <?php if (is_staff()): ?>
+        <a href="<?= e(url('gestion')) ?>"><?= icon('box') ?><span>Gestion</span></a>
+    <?php else: ?>
+        <a href="<?= e(url('profil')) ?>" class="<?= $current === 'profil' ? 'on' : '' ?>"><?= icon('user') ?><span>Profil</span></a>
+    <?php endif; ?>
 </nav>
+<?php endif; ?>
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <script src="<?= e(asset('assets/js/app.js')) ?>" defer></script>

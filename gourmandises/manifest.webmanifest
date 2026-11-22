@@ -1,7 +1,7 @@
 {
   "name": "Gourmandises AFPAR",
   "short_name": "Gourmandises",
-  "description": "Pains et viennoiseries en ligne — livraison et Click & Collect",
+  "description": "Précommande des pains et viennoiseries de la filière Boulangerie AFPAR, livrés dans votre centre",
   "lang": "fr",
   "start_url": "index.php",
   "display": "standalone",

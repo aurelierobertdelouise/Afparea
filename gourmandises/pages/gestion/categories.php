@@ -1,6 +1,8 @@
-<h1 class="h-page">Catégories</h1>
+<p class="crumbs"><a href="<?= e(url('gestion-produits')) ?>">← Catalogue</a></p>
+<h1 class="h-page">Catégories &amp; quotas</h1>
+<p class="lead-admin">Le <strong>quota</strong> est le nombre maximum d'articles de la catégorie par commande (0 = sans limite). Au-delà, le panier affiche une alerte rouge et masque le bouton de paiement.</p>
 <div class="cat-admin">
-    <?php foreach ([...$cats, ['id' => 0, 'slug' => '', 'nom' => '', 'accroche' => '', 'description' => '', 'image' => '', 'ordre' => count($cats) + 1]] as $c): ?>
+    <?php foreach ([...$cats, ['id' => 0, 'slug' => '', 'nom' => '', 'accroche' => '', 'description' => '', 'image' => '', 'quota' => 0, 'ordre' => count($cats) + 1]] as $c): ?>
     <form method="post" enctype="multipart/form-data" class="panel">
         <?= csrf_field() ?>
         <input type="hidden" name="id" value="<?= (int) $c['id'] ?>">
@@ -9,10 +11,10 @@
         <?php if ($c['image']): ?><img class="preview" src="<?= e(asset($c['image'])) ?>" alt=""><?php endif; ?>
         <div class="fields">
             <label>Nom <input name="nom" value="<?= e($c['nom']) ?>" required></label>
-            <label>Ordre <input name="ordre" type="number" value="<?= (int) $c['ordre'] ?>"></label>
-            <label class="full">Accroche <input name="accroche" value="<?= e($c['accroche']) ?>" placeholder="Ex. : Pâtisseries en ligne"></label>
+            <label>Quota / commande <input name="quota" type="number" min="0" value="<?= (int) $c['quota'] ?>"></label>
             <label class="full">Description <textarea name="description" rows="2"><?= e($c['description']) ?></textarea></label>
-            <label class="full">Bandeau (image) <input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label>
+            <label>Ordre <input name="ordre" type="number" value="<?= (int) $c['ordre'] ?>"></label>
+            <label>Bandeau <input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label>
         </div>
         <div class="row-actions">
             <button class="btn btn-cta btn-sm" name="action" value="save">Enregistrer</button>

@@ -7,7 +7,7 @@ function e($value): string
     return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
-/** URL interne : url('panier') => index.php?p=panier */
+/** URL interne : url('panier') => /index.php?p=panier */
 function url(string $page = '', array $params = []): string
 {
     $base = rtrim((string) cfg('base_url', ''), '/');
@@ -15,7 +15,13 @@ function url(string $page = '', array $params = []): string
     return $base . '/index.php' . ($query ? '?' . http_build_query($query) : '');
 }
 
-/** URL d'un fichier statique. */
+/** URL absolue (QR codes, e-mails). */
+function abs_url(string $page = '', array $params = []): string
+{
+    return rtrim((string) cfg('app_url', ''), '/') . url($page, $params);
+}
+
+/** URL d'un fichier statique, avec version pour le cache. */
 function asset(string $path): string
 {
     $base = rtrim((string) cfg('base_url', ''), '/');
@@ -30,12 +36,20 @@ function redirect(string $to): void
     exit;
 }
 
+/** Redirection vers une URL interne uniquement (anti open-redirect). */
+function safe_back(?string $to, string $fallback): string
+{
+    if ($to && str_starts_with($to, '/') && !str_starts_with($to, '//')) {
+        return $to;
+    }
+    return $fallback;
+}
+
 function prix(int $cents): string
 {
     return number_format($cents / 100, 2, ',', ' ') . ' €';
 }
 
-/** Convertit « 1,20 » ou « 1.2 » en centimes. */
 function to_cents(string $value): int
 {
     $value = str_replace([' ', '€', ','], ['', '', '.'], trim($value));
@@ -75,7 +89,7 @@ function csrf_check(): void
     if (!is_string($sent) || !hash_equals(csrf_token(), $sent)) {
         http_response_code(400);
         flash('error', 'Votre session a expiré, merci de recommencer.');
-        redirect($_SERVER['HTTP_REFERER'] ?? url());
+        redirect(url());
     }
 }
 
@@ -90,36 +104,34 @@ function post(string $key, string $default = ''): string
     return is_string($v) ? trim($v) : $default;
 }
 
-// ---- Admin ----------------------------------------------------------------
-function is_admin(): bool
+function get(string $key, string $default = ''): string
 {
-    return !empty($_SESSION['admin']);
+    $v = $_GET[$key] ?? $default;
+    return is_string($v) ? trim($v) : $default;
 }
 
-function require_admin(): void
-{
-    if (!is_admin()) {
-        redirect(url('admin-login'));
-    }
-}
-
-// ---- Données ----------------------------------------------------------------
+// ---- Données de référence ----------------------------------------------------
 function categories(): array
 {
-    return db()->query('SELECT * FROM categories ORDER BY ordre, nom')->fetchAll();
+    static $c = null;
+    return $c ??= db()->query('SELECT * FROM categories ORDER BY ordre, nom')->fetchAll();
 }
 
-function categorie_by_slug(string $slug): ?array
+function centres(bool $actifs = true): array
 {
-    $st = db()->prepare('SELECT * FROM categories WHERE slug = ?');
-    $st->execute([$slug]);
+    return db()->query('SELECT * FROM centres' . ($actifs ? ' WHERE actif = 1' : '') . ' ORDER BY ordre, nom')->fetchAll();
+}
+
+function centre(int $id): ?array
+{
+    $st = db()->prepare('SELECT * FROM centres WHERE id = ?');
+    $st->execute([$id]);
     return $st->fetch() ?: null;
 }
 
 function produits(?int $categorieId = null, bool $actifsSeulement = true): array
 {
-    $sql = 'SELECT p.*, c.nom AS categorie, c.slug AS categorie_slug
-            FROM produits p JOIN categories c ON c.id = p.categorie_id WHERE 1=1';
+    $sql = 'SELECT p.*, c.nom AS categorie, c.slug AS categorie_slug FROM produits p JOIN categories c ON c.id = p.categorie_id WHERE 1=1';
     $args = [];
     if ($categorieId !== null) {
         $sql .= ' AND p.categorie_id = ?';
@@ -128,65 +140,19 @@ function produits(?int $categorieId = null, bool $actifsSeulement = true): array
     if ($actifsSeulement) {
         $sql .= ' AND p.actif = 1';
     }
-    $sql .= ' ORDER BY c.ordre, p.ordre, p.nom';
-    $st = db()->prepare($sql);
+    $st = db()->prepare($sql . ' ORDER BY c.ordre, p.ordre, p.nom');
     $st->execute($args);
     return $st->fetchAll();
 }
 
 function produit(int $id): ?array
 {
-    $st = db()->prepare('SELECT p.*, c.nom AS categorie, c.slug AS categorie_slug FROM produits p JOIN categories c ON c.id = p.categorie_id WHERE p.id = ?');
+    $st = db()->prepare('SELECT p.*, c.nom AS categorie, c.slug AS categorie_slug, c.quota FROM produits p JOIN categories c ON c.id = p.categorie_id WHERE p.id = ?');
     $st->execute([$id]);
     return $st->fetch() ?: null;
 }
 
-function statuts(): array
-{
-    return [
-        'nouvelle'      => 'Nouvelle',
-        'preparation'   => 'En préparation',
-        'prete'         => 'Prête',
-        'en_livraison'  => 'En livraison',
-        'terminee'      => 'Terminée',
-        'annulee'       => 'Annulée',
-    ];
-}
-
-function statut_label(string $s): string
-{
-    return statuts()[$s] ?? $s;
-}
-
-function mode_label(string $m): string
-{
-    return $m === 'livraison' ? 'Livraison' : 'Click & Collect';
-}
-
-/** Liste des dates proposées à la commande. */
-function dates_disponibles(): array
-{
-    $jours = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
-    $mois = ['', 'janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
-    $out = [];
-    $d = new DateTimeImmutable('today');
-    $d = $d->modify('+' . (int) cfg('lead_days', 0) . ' day');
-    for ($i = 0; $i < (int) cfg('max_days', 14); $i++) {
-        $day = $d->modify("+$i day");
-        $label = ucfirst($jours[(int) $day->format('w')]) . ' ' . $day->format('j') . ' ' . $mois[(int) $day->format('n')];
-        if ($i === 0 && (int) cfg('lead_days', 0) === 0) {
-            $label = "Aujourd'hui ($label)";
-        }
-        $out[$day->format('Y-m-d')] = $label;
-    }
-    return $out;
-}
-
-function date_fr(string $ymd): string
-{
-    return dates_disponibles()[$ymd] ?? DateTime::createFromFormat('Y-m-d', $ymd)->format('d/m/Y');
-}
-
+// ---- Rendu --------------------------------------------------------------------
 function render(string $view, array $vars = [], string $layout = 'layout'): void
 {
     extract($vars, EXTR_SKIP);
@@ -200,6 +166,23 @@ function not_found(): void
 {
     http_response_code(404);
     render('404', ['title' => 'Page introuvable']);
+    exit;
+}
+
+/** Export CSV compatible Excel (UTF-8 avec BOM, séparateur « ; »). */
+function send_csv(string $filename, array $header, array $rows): void
+{
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    $out = fopen('php://output', 'w');
+    fwrite($out, "\xEF\xBB\xBF");
+    fputcsv($out, $header, ';');
+    foreach ($rows as $r) {
+        // Neutralise l'injection de formules dans Excel
+        $r = array_map(fn($v) => is_string($v) && preg_match('/^[=+\-@]/', $v) ? "'" . $v : $v, $r);
+        fputcsv($out, $r, ';');
+    }
+    fclose($out);
     exit;
 }
 
@@ -218,29 +201,46 @@ function icon(string $name): string
         'pin'       => '<path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
         'check'     => '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
         'trash'     => '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+        'user'      => '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>',
+        'list'      => '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
+        'card'      => '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/>',
+        'alert'     => '<path d="M12 3 2 20h20L12 3zM12 10v4M12 17h.01"/>',
+        'mail'      => '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+        'box'       => '<path d="M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10"/>',
+        'logout'    => '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>',
+        'download'  => '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+        'print'     => '<path d="M7 9V3h10v6M7 17H4v-7h16v7h-3M7 14h10v7H7z"/>',
     ][$name] ?? '';
     return '<svg class="ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' . $p . '</svg>';
 }
 
-/** Carte produit réutilisable. */
-function product_card(array $p): string
+/** Carte produit (catalogue). */
+function product_card(array $p, ?string $dateRef = null): string
 {
+    $restant = $dateRef ? stock_restant($p, $dateRef) : ($p['disponible'] ? null : 0);
+    $epuise = $restant === 0;
     ob_start(); ?>
-    <article class="card">
+    <article class="card <?= $epuise ? 'is-out' : '' ?>" data-cat="<?= e($p['categorie_slug']) ?>">
         <a class="card-img" href="<?= e(url('produit', ['id' => $p['id']])) ?>">
             <img src="<?= e(asset($p['image'] ?: 'assets/img/logo-afpar.png')) ?>" alt="<?= e($p['nom']) ?>" loading="lazy" width="600" height="450">
             <span class="tag"><?= e($p['nom']) ?></span>
+            <span class="stock <?= $epuise ? 'stock-out' : 'stock-in' ?>"><?= $epuise ? 'Épuisé' : ($restant !== null && $restant <= 10 ? 'Plus que ' . $restant : 'En stock') ?></span>
         </a>
         <div class="card-body">
             <h3><a href="<?= e(url('produit', ['id' => $p['id']])) ?>"><?= e($p['nom']) ?></a></h3>
             <p class="muted"><?= e($p['description']) ?></p>
+            <?php if ($p['allergenes']): ?><p class="allerg"><strong>Allergènes :</strong> <?= e($p['allergenes']) ?></p><?php endif; ?>
             <div class="card-foot">
                 <span class="price"><?= prix((int) $p['prix_cents']) ?></span>
+                <?php if ($epuise): ?>
+                    <span class="btn btn-sm btn-disabled">Épuisé</span>
+                <?php else: ?>
                 <form method="post" action="<?= e(url('panier-ajouter')) ?>" data-add-to-cart>
                     <?= csrf_field() ?>
                     <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
                     <button class="btn btn-green btn-sm" type="submit"><?= icon('cart') ?> Ajouter</button>
                 </form>
+                <?php endif; ?>
             </div>
         </div>
     </article>

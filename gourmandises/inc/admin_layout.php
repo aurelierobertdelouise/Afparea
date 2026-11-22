@@ -1,38 +1,46 @@
-<?php $current = $_GET['p'] ?? 'admin'; ?><!DOCTYPE html>
+<?php
+$current = $_GET['p'] ?? 'gestion';
+$me = current_user();
+$q = array_filter(['jour' => $_GET['jour'] ?? null, 'centre' => $_GET['centre'] ?? null]);
+$nav = [
+    'gestion' => ['Tableau du jour', 'list', false],
+    'gestion-emargement' => ['Émargement', 'check', false],
+    'gestion-production' => ['Fournil', 'bread', true],
+    'gestion-colisage' => ['Colisage', 'box', true],
+    'gestion-produits' => ['Catalogue', 'croissant', true],
+    'gestion-centres' => ['Centres', 'pin', true],
+    'gestion-utilisateurs' => ['Utilisateurs', 'user', true],
+];
+?><!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="robots" content="noindex, nofollow">
-    <title><?= e($title ?? 'Administration') ?> · Espace équipe</title>
-    <link rel="icon" type="image/png" href="<?= e(asset('assets/img/favicon.png')) ?>">
-    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Pacifico&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= e(asset('assets/css/style.css')) ?>">
+<?php require __DIR__ . '/head.php'; ?>
 </head>
 <body class="admin">
+<a class="skip" href="#contenu">Aller au contenu</a>
 <header class="topbar">
     <div class="wrap topbar-in">
-        <a class="brand" href="<?= e(url('admin')) ?>">
-            <img src="<?= e(asset('assets/img/logo-afpar.png')) ?>" alt="Logo AFPAR" width="44" height="50">
-            <span><strong>Espace équipe</strong><small><?= e(cfg('app_name')) ?></small></span>
+        <a class="brand" href="<?= e(url('gestion')) ?>">
+            <img src="<?= e(asset('assets/img/logo-afpar.png')) ?>" alt="AFPAR" width="44" height="50">
+            <span><strong>Gestion</strong><small><?= e(ROLES[$me['role']] ?? '') ?><?= $me['role'] === 'referent' ? ' · ' . e($me['centre_nom']) : '' ?></small></span>
         </a>
-        <?php if (is_admin()): ?>
-        <nav class="mainnav admin-nav">
-            <a href="<?= e(url('admin')) ?>" class="<?= in_array($current, ['admin', 'admin-commande'], true) ? 'on' : '' ?>">Commandes</a>
-            <a href="<?= e(url('admin-produits')) ?>" class="<?= in_array($current, ['admin-produits', 'admin-produit'], true) ? 'on' : '' ?>">Produits</a>
-            <a href="<?= e(url('admin-categories')) ?>" class="<?= $current === 'admin-categories' ? 'on' : '' ?>">Catégories</a>
-            <a href="<?= e(url()) ?>" target="_blank" rel="noopener">Voir la boutique ↗</a>
-            <a href="<?= e(url('admin-logout')) ?>">Déconnexion</a>
+        <nav class="mainnav admin-nav" aria-label="Gestion">
+            <?php foreach ($nav as $k => [$label, $ico, $adminOnly]):
+                if ($adminOnly && $me['role'] !== 'admin') continue;
+                $on = $current === $k || ($k === 'gestion-produits' && in_array($current, ['gestion-produit', 'gestion-categories'], true)) || ($k === 'gestion' && $current === 'gestion-commande'); ?>
+                <a href="<?= e(url($k, in_array($k, ['gestion', 'gestion-emargement', 'gestion-production', 'gestion-colisage'], true) ? $q : [])) ?>" class="<?= $on ? 'on' : '' ?>"><?= icon($ico) ?> <?= e($label) ?></a>
+            <?php endforeach; ?>
+            <a href="<?= e(url()) ?>"><?= icon('shop') ?> Boutique</a>
         </nav>
-        <?php endif; ?>
     </div>
 </header>
-<main class="wrap main">
+<main class="wrap main" id="contenu">
     <?php foreach (flashes() as $f): ?>
         <div class="flash flash-<?= e($f['type']) ?>" role="status"><?= e($f['message']) ?></div>
     <?php endforeach; ?>
     <?= $content ?>
 </main>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <script src="<?= e(asset('assets/js/app.js')) ?>" defer></script>
 </body>
 </html>

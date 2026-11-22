@@ -1,0 +1,5 @@
+config.php
+data/*.sqlite*
+assets/img/uploads/*
+!assets/img/uploads/.htaccess
+!assets/img/uploads/.gitkeep

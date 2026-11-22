@@ -1,0 +1,5 @@
+# Aucune exécution de script dans le dossier d'images envoyées
+<FilesMatch "\.(?i:php\d?|phtml|phar|pl|py|cgi|sh)$">
+    Require all denied
+</FilesMatch>
+Options -ExecCGI

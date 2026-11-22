@@ -1,0 +1,11 @@
+{
+  "name": "Gourmandises AFPAR",
+  "short_name": "Gourmandises",
+  "description": "Pains et viennoiseries en ligne — livraison et Click & Collect",
+  "lang": "fr",
+  "start_url": "index.php",
+  "display": "standalone",
+  "background_color": "#24284A",
+  "theme_color": "#2F2E4E",
+  "icons": [{ "src": "assets/img/logo-afpar.png", "sizes": "433x496", "type": "image/png", "purpose": "any" }]
+}

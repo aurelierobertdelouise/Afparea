@@ -114,6 +114,7 @@ php -S localhost:8000
 gourmandises/
 ├── index.php              routeur (index.php?p=…)
 ├── stripe-webhook.php     confirmation des paiements par Stripe
+├── verif.php              diagnostic d'installation (activé par 'install_check')
 ├── config.sample.php      modèle de configuration → config.php (non versionné)
 ├── inc/                   bootstrap, base, auth (PIN), panier, commandes/quotas, Stripe, gabarits
 ├── pages/                 vues salarié + gestion/ (back-office)

@@ -72,5 +72,8 @@ return [
     'responsable_traitement' => 'AFPAR — Directeur d\'exploitation',
     'hebergeur' => 'LWS (Ligne Web Services), 10 rue Penthièvre, 75008 Paris',
 
+    // Page de diagnostic /verif.php : mettre true le temps de l'installation, puis false.
+    'install_check' => false,
+
     'timezone' => 'Indian/Reunion',
 ];

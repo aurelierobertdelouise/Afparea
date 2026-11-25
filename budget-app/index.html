@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#51470A">
+  <meta name="description" content="Gestion de budget simple : dépenses, revenus, reste à vivre, historique des mois.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Mon Budget">
+  <title>Mon Budget</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <img class="topbar__logo" src="icons/logo.png" alt="">
+    <div class="month-nav">
+      <button class="icon-btn" data-action="prev-month" aria-label="Mois précédent">‹</button>
+      <div class="month-nav__label">
+        <span id="month-label">—</span>
+        <small id="month-status"></small>
+      </div>
+      <button class="icon-btn" data-action="next-month" aria-label="Mois suivant">›</button>
+    </div>
+  </header>
+
+  <main id="view" class="view" tabindex="-1"></main>
+
+  <nav class="tabbar" aria-label="Navigation principale">
+    <button class="tab is-active" data-tab="home"><span class="tab__ico">◉</span><span>Accueil</span></button>
+    <button class="tab" data-tab="moves"><span class="tab__ico">☰</span><span>Opérations</span></button>
+    <button class="fab" data-action="add" aria-label="Ajouter une opération">+</button>
+    <button class="tab" data-tab="history"><span class="tab__ico">▤</span><span>Historique</span></button>
+    <button class="tab" data-tab="settings"><span class="tab__ico">⚙</span><span>Réglages</span></button>
+  </nav>
+
+  <div id="sheet-backdrop" class="backdrop" hidden></div>
+  <section id="sheet" class="sheet" role="dialog" aria-modal="true" hidden></section>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -26,6 +26,7 @@ de l'AFPAR (marine `#2F2E4E`, vert `#4EB688`, jaune `#FCC324`).
 | 6.5 / 2.4 | Récapitulatif de production du jour J | *Fournil* : totaux par produit + matrice produit × centre, imprimable |
 | 5.3 | Feuille de colisage / expédition par centre | *Colisage* : un bac par centre, sacs nominatifs, imprimable |
 | 5.3 / 2.5 | Feuille d'émargement / distribution locale | *Émargement* sur tablette (bouton « Remis », horodaté, nom du remettant) ou papier |
+| 6.4 / 5.3 | Remise au point relais par QR code | Bouton **« Scanner un QR code »** sur la page Émargement (caméra du téléphone ou de la tablette, sans application à installer) : nom, contenu, alertes mauvais jour / déjà remise / autre centre, validation « Remis ✓ » en un geste. Repli : code de retrait à 4 chiffres |
 | 6.5 | Export CSV / Excel | UTF-8 + BOM, séparateur `;`, protection contre l'injection de formules |
 | 7.2 | Un salarié ne voit que ses commandes | Contrôle systématique côté serveur (équivalent des *Row Owners* Glide) |
 | 7.2 | Référent centre : uniquement son centre ; Admin/Boulangerie : transversal | Rôles `client` / `referent` / `admin`, filtre SQL forcé par centre |

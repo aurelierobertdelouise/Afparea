@@ -50,8 +50,18 @@ function lignes_par_commande(array $commandes): array
 function find_scoped_order(array $me, string $ref): array
 {
     $cmd = commande_by_ref(strtoupper($ref));
-    if (!$cmd || ($me['role'] !== 'admin' && (int) $cmd['centre_id'] !== (int) $me['centre_id'])) {
+    if (!$cmd) {
         not_found();
+    }
+    if ($me['role'] !== 'admin' && (int) $cmd['centre_id'] !== (int) $me['centre_id']) {
+        // Message explicite sans divulguer le contenu ni l'identité (cloisonnement §7.2)
+        http_response_code(403);
+        render('erreur', [
+            'title' => 'Commande d\'un autre centre',
+            'message' => 'La commande ' . $cmd['reference'] . ' est à retirer à ' . $cmd['centre_nom']
+                . ($cmd['point_relais'] ? ' (' . $cmd['point_relais'] . ')' : '') . ', le ' . date_fr($cmd['date_retrait']) . '.',
+        ], 'admin_layout');
+        exit;
     }
     return $cmd;
 }
@@ -98,6 +108,42 @@ switch ($page) {
         }
         redirect(safe_back(post('retour'), url('gestion-commande', ['ref' => $cmd['reference']])));
         break;
+
+    // ----------------------------------- Scanner de QR code (émargement)
+    case 'gestion-scan':
+        header('Content-Type: application/json');
+        $ref = strtoupper(get('ref'));
+        $cmd = $ref !== '' ? commande_by_ref($ref) : null;
+        if (!$cmd && preg_match('/^\d{4}$/', get('code'))) {
+            $st = $pdo->prepare('SELECT reference FROM commandes c WHERE c.code_retrait = ? AND c.date_retrait = ?' . centre_scope($me)[0]);
+            $st->execute(array_merge([get('code'), $jour], centre_scope($me)[1]));
+            $cmd = ($r = $st->fetchColumn()) ? commande_by_ref((string) $r) : null;
+        }
+        if (!$cmd || $cmd['statut'] === 'en_attente') {
+            echo json_encode(['ok' => false, 'erreur' => 'Commande introuvable.']);
+            exit;
+        }
+        if (!$isAdmin && (int) $cmd['centre_id'] !== (int) $me['centre_id']) {
+            echo json_encode(['ok' => false, 'erreur' => 'Commande d\'un autre centre : à retirer à ' . $cmd['centre_nom']
+                . ($cmd['point_relais'] ? ' (' . $cmd['point_relais'] . ')' : '') . ', le ' . date_fr($cmd['date_retrait']) . '.']);
+            exit;
+        }
+        echo json_encode([
+            'ok' => true,
+            'ref' => $cmd['reference'],
+            'nom' => trim($cmd['prenom'] . ' ' . $cmd['nom']),
+            'code' => $cmd['code_retrait'],
+            'statut' => $cmd['statut'],
+            'statut_label' => statut_label($cmd['statut']),
+            'remise' => $cmd['remise_at'] ? date('H:i', strtotime($cmd['remise_at'])) . ($cmd['remise_par'] ? ' par ' . $cmd['remise_par'] : '') : '',
+            'centre' => $cmd['centre_nom'],
+            'date' => date_fr($cmd['date_retrait']),
+            'autre_jour' => $cmd['date_retrait'] !== date('Y-m-d'),
+            'autre_centre_admin' => $isAdmin && $centreId && (int) $cmd['centre_id'] !== $centreId,
+            'lignes' => array_map(fn($l) => (int) $l['quantite'] . ' × ' . $l['nom'], commande_lignes((int) $cmd['id'])),
+            'total' => prix((int) $cmd['total_cents']),
+        ]);
+        exit;
 
     case 'gestion-commande':
         $ref = get('ref');

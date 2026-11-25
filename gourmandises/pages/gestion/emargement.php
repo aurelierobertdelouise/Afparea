@@ -1,7 +1,10 @@
 <?php $page_key = 'gestion-emargement'; $centreRequired = true; ?>
 <div class="admin-head">
     <h1 class="h-page">Émargement — <?= e($centre['nom'] ?? '') ?></h1>
-    <div class="toolbar no-print"><button class="btn btn-ghost btn-sm" data-print><?= icon('print') ?> Version papier</button></div>
+    <div class="toolbar no-print">
+        <button class="btn btn-cta btn-sm" type="button" data-scan-open hidden><?= icon('box') ?> Scanner un QR code</button>
+        <button class="btn btn-ghost btn-sm" data-print><?= icon('print') ?> Version papier</button>
+    </div>
 </div>
 <?php require __DIR__ . '/_filtres.php'; ?>
 <p class="print-only">Point relais : <?= e($centre['point_relais'] ?? '') ?> — <?= e(date_fr($jour)) ?></p>
@@ -21,7 +24,7 @@
         <thead><tr><th>Salarié</th><th>Contenu</th><th>Code</th><th class="no-print">Statut</th><th>Signature / remise</th></tr></thead>
         <tbody>
         <?php foreach ($commandes as $c): ?>
-            <tr data-name="<?= e(mb_strtolower($c['nom'] . ' ' . $c['prenom'])) ?>" class="<?= $c['statut'] === 'recuperee' ? 'done' : '' ?>">
+            <tr data-ref="<?= e($c['reference']) ?>" data-name="<?= e(mb_strtolower($c['nom'] . ' ' . $c['prenom'])) ?>" class="<?= $c['statut'] === 'recuperee' ? 'done' : '' ?>">
                 <td><strong><?= e($c['nom']) ?></strong> <?= e($c['prenom']) ?><br><small class="muted"><?= e($c['reference']) ?></small></td>
                 <td class="small"><?php foreach ($lignes[$c['id']] ?? [] as $l): ?><?= (int) $l['quantite'] ?> <?= e($l['nom']) ?><br><?php endforeach; ?></td>
                 <td><b><?= e($c['code_retrait']) ?></b></td>
@@ -43,3 +46,23 @@
     </table>
 </div>
 <?php endif; ?>
+
+<?php /* Scanner de QR code : s'affiche par-dessus la liste */ ?>
+<div class="scan-overlay" data-scan hidden role="dialog" aria-modal="true" aria-label="Scanner un QR code de retrait"
+     data-scan-url="<?= e(url('gestion-scan', ['jour' => $jour, 'centre' => $centreId])) ?>"
+     data-statut-url="<?= e(url('gestion-statut')) ?>" data-csrf="<?= e(csrf_token()) ?>">
+    <div class="scan-box">
+        <div class="scan-head">
+            <strong>Scanner le QR code du reçu</strong>
+            <button type="button" class="icon-btn scan-close" data-scan-close aria-label="Fermer">✕</button>
+        </div>
+        <div class="scan-video" data-scan-camera>
+            <video playsinline muted></video>
+            <span class="scan-frame" aria-hidden="true"></span>
+            <p class="scan-msg" data-scan-msg>Activation de la caméra…</p>
+        </div>
+        <div class="scan-result" data-scan-result hidden></div>
+    </div>
+</div>
+<script src="<?= e(asset('assets/js/vendor/jsQR.js')) ?>" defer></script>
+<script src="<?= e(asset('assets/js/scanner.js')) ?>" defer></script>

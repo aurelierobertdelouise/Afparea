@@ -1,9 +1,10 @@
 // Service worker : permet l'utilisation hors-ligne de l'application.
-const CACHE = 'mon-budget-v1';
+const CACHE = 'mon-budget-v2';
 const ASSETS = [
   './', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest',
   'icons/logo.png', 'icons/icon-192.png', 'icons/icon-512.png',
-  'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'
+  'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png',
+  'vendor/xlsx.full.min.js'
 ];
 
 self.addEventListener('install', (e) => {

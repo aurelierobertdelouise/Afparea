@@ -36,6 +36,7 @@
     showDonut: true,
     showBudgets: true,
     showForecast: true,
+    showFuture: false,      // afficher les 6 mois suivants (prévisions modifiables)
   };
 
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -199,6 +200,51 @@
     return state.months[key];
   }
 
+  // Copie des opérations récurrentes du mois `fromKey` pour le mois `toKey` (à pointer).
+  function recurringFor(fromKey, toKey) {
+    const src = state.months[fromKey];
+    if (!src) return [];
+    const [y, mo] = toKey.split('-').map(Number);
+    const last = new Date(y, mo, 0).getDate();
+    return src.items
+      .filter((it) => it.recurring && it.cat !== CARRY && !(it.endMonth && it.endMonth < toKey))
+      .map((it) => {
+        const day = it.date ? Number(it.date.slice(8, 10)) : 0;
+        return { ...it, id: uid(), done: false, date: day ? `${toKey}-${String(Math.min(day, last)).padStart(2, '0')}` : '' };
+      });
+  }
+
+  // Crée les 6 mois suivants (s'ils n'existent pas) préremplis avec les récurrents.
+  function ensureFuture() {
+    if (!state.settings.showFuture) return;
+    let changed = false;
+    for (let i = 1; i <= 6; i++) {
+      const k = addMonths(state.current, i);
+      if (!state.months[k]) { state.months[k] = { key: k, closed: false, planned: true, items: recurringFor(state.current, k) }; changed = true; }
+    }
+    if (changed) save();
+  }
+
+  // Mois affichés : les mois prévisionnels sont masqués quand l'option est désactivée.
+  function visibleKeys() {
+    return Object.keys(state.months).sort().filter((k) => !(state.months[k].planned && !state.settings.showFuture));
+  }
+
+  function deleteMonth(key) {
+    const removed = state.months[key];
+    const prevCurrent = state.current;
+    delete state.months[key];
+    if (!Object.keys(state.months).length) ensureMonth(todayKey());
+    if (!state.months[state.current]) {
+      const real = Object.keys(state.months).sort().filter((k) => !state.months[k].planned);
+      state.current = real.length ? real[real.length - 1] : Object.keys(state.months).sort()[0];
+      state.months[state.current].planned = false;
+    }
+    if (ui.viewing === key) ui.viewing = state.current;
+    save();
+    return () => { state.months[key] = removed; state.current = prevCurrent; save(); };
+  }
+
   // Clôture le mois `key` et prépare le suivant (récurrents + report du solde).
   function closeMonth(key) {
     const m = state.months[key];
@@ -206,16 +252,8 @@
     const already = !!state.months[nextKey];
     const next = ensureMonth(nextKey);
     m.closed = true;
-    if (!already || !next.items.length) {
-      const [ny, nm] = nextKey.split('-').map(Number);
-      for (const it of m.items) {
-        if (!it.recurring || it.cat === CARRY) continue;
-        if (it.endMonth && it.endMonth < nextKey) continue;
-        const day = it.date ? Number(it.date.slice(8, 10)) : 1;
-        const last = new Date(ny, nm, 0).getDate();
-        next.items.push({ ...it, id: uid(), done: false, date: `${nextKey}-${String(Math.min(day, last)).padStart(2, '0')}` });
-      }
-    }
+    next.planned = false;
+    if (!already || !next.items.some((it) => it.cat !== CARRY)) next.items.push(...recurringFor(key, nextKey));
     if (state.settings.carryOver) {
       next.items = next.items.filter((it) => it.cat !== CARRY);
       const reste = monthStats(key).reste;
@@ -238,11 +276,12 @@
   function render() {
     document.documentElement.dataset.theme = state.settings.theme === 'auto' ? '' : state.settings.theme;
     if (state.settings.theme === 'auto') delete document.documentElement.dataset.theme;
-    const keys = Object.keys(state.months).sort();
-    if (!state.months[ui.viewing]) ui.viewing = state.current;
+    ensureFuture();
+    const keys = visibleKeys();
+    if (!keys.includes(ui.viewing)) ui.viewing = state.current;
     const m = state.months[ui.viewing];
     $('#month-label').textContent = monthName(ui.viewing);
-    $('#month-status').textContent = m.closed ? '🔒 Mois clôturé' : (ui.viewing === state.current ? 'Mois en cours' : 'Mois ouvert');
+    $('#month-status').textContent = m.closed ? '🔒 Mois clôturé' : m.planned ? '📅 Prévision (récurrents)' : (ui.viewing === state.current ? 'Mois en cours' : 'Mois ouvert');
     $('[data-action="prev-month"]').disabled = keys.indexOf(ui.viewing) <= 0;
     $('[data-action="next-month"]').disabled = keys.indexOf(ui.viewing) >= keys.length - 1;
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('is-active', t.dataset.tab === ui.tab));
@@ -396,15 +435,16 @@
   }
 
   function renderHistory() {
-    const keys = Object.keys(state.months).sort();
-    const stats = keys.map((k) => ({ k, ...monthStats(k), closed: state.months[k].closed }));
+    const keys = visibleKeys();
+    const all = keys.map((k) => ({ k, ...monthStats(k), closed: state.months[k].closed, planned: !!state.months[k].planned }));
+    const stats = all.filter((s) => !s.planned);
     const max = Math.max(1, ...stats.map((s) => Math.max(s.inPlan, s.outPlan)));
-    const avgOut = stats.reduce((a, s) => a + s.outPlan, 0) / stats.length;
-    const avgReste = stats.reduce((a, s) => a + s.reste, 0) / stats.length;
+    const avgOut = stats.reduce((a, s) => a + s.outPlan, 0) / Math.max(1, stats.length);
+    const avgReste = stats.reduce((a, s) => a + s.reste, 0) / Math.max(1, stats.length);
     const cur = state.months[state.current];
 
-    let html = `<div class="card"><div class="hist-chart">${stats.map((s) => `<button class="hist-col ${s.k === ui.viewing ? 'is-current' : ''}" data-action="goto" data-key="${s.k}" style="border:0;background:none" aria-label="${esc(monthName(s.k))}">
-        <div class="hist-bars"><span class="in" style="height:${(s.inPlan / max * 100).toFixed(1)}%"></span><span class="out" style="height:${(s.outPlan / max * 100).toFixed(1)}%"></span></div>
+    let html = `<div class="card"><div class="hist-chart">${all.map((s) => `<button class="hist-col ${s.k === ui.viewing ? 'is-current' : ''}" data-action="goto" data-key="${s.k}" style="border:0;background:none" aria-label="${esc(monthName(s.k))}">
+        <div class="hist-bars"><span class="in" style="${s.planned ? 'opacity:.45;' : ''}"height:${(s.inPlan / max * 100).toFixed(1)}%"></span><span class="out" style="${s.planned ? 'opacity:.45;' : ''}"height:${(s.outPlan / max * 100).toFixed(1)}%"></span></div>
         <span class="hist-m">${esc(monthName(s.k, 'short'))}</span></button>`).join('')}</div>
       <div class="chart-legend"><span><i style="background:var(--green)"></i>Revenus</span><span><i style="background:var(--olive-2)"></i>Dépenses</span></div></div>
       <div class="tiles">
@@ -416,15 +456,21 @@
         <p class="small muted" style="margin:6px 0 12px">Clôture et sauvegarde ${esc(monthName(state.current))}, puis crée ${esc(monthName(addMonths(state.current, 1)))} avec vos opérations récurrentes${state.settings.carryOver ? ' et le report du solde' : ''}.</p>
         <button class="btn btn-block btn-olive" data-action="close-month" data-key="${state.current}" ${cur.closed ? 'disabled' : ''}>🔒 Clôturer ${esc(monthName(state.current))}</button>
       </div>
-      <h2 class="section-title">Mois sauvegardés</h2><div class="list">`;
-    html += stats.slice().reverse().map((s) => `<div class="row">
-      <div class="row__ico" style="background:var(--olive-soft)">${s.closed ? '🔒' : '📂'}</div>
+      <div class="card" style="margin-top:12px">
+        <label class="switch-row" style="padding-top:0"><span class="switch-row__text">Afficher les 6 mois suivants<small>Préremplis avec vos opérations récurrentes, modifiables</small></span>
+          <span class="switch"><input type="checkbox" data-setting="showFuture" ${state.settings.showFuture ? 'checked' : ''}><span></span></span></label>
+        <button class="btn btn-block" data-action="import-month">⬆ Importer un mois complet</button>
+        <p class="small muted" style="margin:8px 0 0">Depuis un classeur Excel / Google Sheets (.xlsx), un fichier .csv ou des lignes copiées-collées.</p>
+      </div>
+      <h2 class="section-title">Mois</h2><div class="list">`;
+    html += all.slice().reverse().map((s) => `<div class="row">
+      <div class="row__ico" style="background:var(--olive-soft)">${s.planned ? '📅' : s.closed ? '🔒' : '📂'}</div>
       <button class="row__main" data-action="goto" data-key="${s.k}">
-        <div class="row__title" style="text-transform:capitalize">${esc(monthName(s.k))}</div>
+        <div class="row__title" style="text-transform:capitalize;white-space:normal">${esc(monthName(s.k))}</div>
         <div class="row__meta num"><span>+${money(s.inPlan, { short: true })}</span><span>−${money(s.outPlan, { short: true })}</span><span>${s.count} op.</span></div>
       </button>
       <span class="row__amount num ${s.reste < 0 ? 'neg' : 'pos'}">${money(s.reste)}</span>
-      ${s.closed ? `<button class="btn btn-ghost btn-sm" data-action="reopen" data-key="${s.k}">Rouvrir</button>` : ''}
+      <button class="btn btn-ghost btn-sm" data-action="month-menu" data-key="${s.k}" aria-label="Actions pour ${esc(monthName(s.k))}">⋯</button>
     </div>`).join('');
     html += `</div>
       <div class="btn-row"><button class="btn btn-ghost" data-action="new-past-month">+ Ajouter un mois passé</button></div>`;
@@ -462,7 +508,8 @@
       ${sw('showPerDay', 'Montant disponible par jour')}
       ${sw('showDonut', 'Répartition des dépenses')}
       ${sw('showBudgets', 'Budgets par catégorie')}
-      ${sw('showForecast', 'Prévisions sur 6 mois')}
+      ${sw('showForecast', 'Graphique des prévisions sur 6 mois')}
+      ${sw('showFuture', 'Afficher les 6 mois suivants', 'Mois préremplis avec les récurrents, consultables et modifiables')}
     </div>
 
     <h2 class="section-title">Sauvegarde des données</h2><div class="card">
@@ -585,6 +632,177 @@
   }
   let pendingConfirm = null;
 
+
+  // ------------------------------------------------------------------ Import d'un mois complet
+  const norm = (v) => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const truthy = (v) => v === true || v === 1 || ['true', 'vrai', 'oui', 'x', '1', 'yes', '✓', '☑'].includes(norm(v));
+  const MONTHS_FR = ['janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'aout', 'septembre', 'octobre', 'novembre', 'decembre'];
+  // Lecteur Excel (SheetJS 0.18.5, Apache-2.0), chargé seulement au premier import d'un classeur.
+  const XLSX_URL = 'vendor/xlsx.full.min.js';
+  let imp = null; // { wb, sheetNames, rows, source }
+
+  function parseDelimited(text) {
+    const first = text.split(/\r?\n/).find((l) => l.trim()) || '';
+    const d = first.includes('\t') ? '\t' : (first.split(';').length >= first.split(',').length ? ';' : ',');
+    const rows = []; let row = [], cell = '', q = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; continue; }
+      if (c === '"' && cell === '') q = true;
+      else if (c === d) { row.push(cell); cell = ''; }
+      else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+      else cell += c;
+    }
+    if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+    return rows;
+  }
+
+  function loadSheetJS() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    return new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = XLSX_URL;
+      s.onload = () => res(window.XLSX); s.onerror = () => rej(new Error('xlsx'));
+      document.head.appendChild(s);
+    });
+  }
+
+  // Transforme un tableau de lignes en opérations, d'après les en-têtes (Catégorie, Libellé, Montant…).
+  function rowsToItems(rows, opts) {
+    const hi = rows.findIndex((r) => r.some((c) => /libell/.test(norm(c))));
+    const header = hi >= 0 ? rows[hi].map(norm) : [];
+    const col = (re, fallback) => { const i = header.findIndex((h) => re.test(h)); return i >= 0 ? i : fallback; };
+    const C = {
+      cat: col(/categ|origine/, hi >= 0 ? 0 : 0), label: col(/libell/, 1), amount: col(/montant/, 2),
+      rec: col(/recurr/, 3), done: col(/termin|point/, 4), date: col(/^date|operation/, -1), type: col(/^type/, -1),
+    };
+    const items = [], newCats = new Map(); let skipped = 0;
+    const findCat = (name, type) => {
+      const n = norm(name);
+      if (!n) return null;
+      return state.categories.find((c) => norm(c.name) === n && c.type === type) || state.categories.find((c) => norm(c.name) === n)
+        || [...newCats.values()].find((c) => norm(c.name) === n) || null;
+    };
+    const fallback = (type) => state.categories.find((c) => c.type === type && /autre/.test(norm(c.name))) || state.categories.find((c) => c.type === type);
+    for (const r of rows.slice(hi + 1)) {
+      const label = String(r[C.label] ?? '').replace(/\s+/g, ' ').trim();
+      const raw = r[C.amount];
+      let amount = typeof raw === 'number' ? Math.round(raw * 100) / 100 : parseAmount(String(raw ?? '').replace(/[€$£]|EUR/g, ''));
+      if (!label && !Number.isFinite(amount)) continue;
+      if (!label || !Number.isFinite(amount) || amount === 0) { skipped++; continue; }
+      let type = C.type >= 0 && /^rev|^entr|^cred/.test(norm(r[C.type])) ? 'revenu' : opts.type;
+      if (amount < 0) { amount = -amount; type = type === 'revenu' ? 'depense' : 'revenu'; }
+      const isCarry = /^solde (precedent|de )/.test(norm(label));
+      let cat;
+      if (isCarry) cat = CARRY;
+      else {
+        const name = String(r[C.cat] ?? '').replace(/\s+/g, ' ').trim();
+        const looksLikeId = /^[A-Za-z0-9_-]{18,}$/.test(name);
+        let c = looksLikeId ? null : findCat(name, type);
+        if (!c && name && !looksLikeId && opts.createCats) {
+          c = { id: uid(), name, icon: type === 'revenu' ? '💶' : '🏷️', color: PALETTE[(state.categories.length + newCats.size) % PALETTE.length], type, budget: 0 };
+          newCats.set(c.id, c);
+        }
+        cat = (c || fallback(type) || {}).id;
+      }
+      let date = '';
+      const dv = C.date >= 0 ? r[C.date] : null;
+      if (dv instanceof Date && !isNaN(dv)) date = isoDate(dv);
+      else if (typeof dv === 'string') { const m = dv.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/) || []; const iso = dv.match(/^(\d{4})-(\d{2})-(\d{2})/); date = iso ? iso[0] : m[3] ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : ''; }
+      items.push({
+        id: uid(), type, cat, label: isCarry ? 'Solde précédent' : label, amount,
+        recurring: isCarry ? false : (C.rec >= 0 ? truthy(r[C.rec]) : false),
+        done: C.done >= 0 && r[C.done] !== undefined && r[C.done] !== '' ? truthy(r[C.done]) : true,
+        date, endMonth: '', note: '',
+      });
+    }
+    return { items, newCats: [...newCats.values()], skipped, headerFound: hi >= 0 };
+  }
+
+  function openImportSheet() {
+    imp = { wb: null, sheetNames: [], rows: null };
+    const keys = Object.keys(state.months).sort();
+    const def = addMonths(keys[0], -1);
+    openSheet(`<h2 class="sheet__title">Importer un mois<button class="sheet__close" data-action="close-sheet" aria-label="Fermer">✕</button></h2>
+      <p class="small muted">Colonnes reconnues : Catégorie, Libellé, Montant, Récurrent ?, Terminé (et Date ou Type si présents). La ligne d'en-tête est détectée automatiquement.</p>
+      <label class="field"><span class="field__label">Mois concerné</span><input class="input" type="month" id="imp-month" value="${def}"></label>
+      <label class="field"><span class="field__label">Fichier (.xlsx, .csv)</span><input class="input" type="file" id="imp-file" accept=".xlsx,.xls,.ods,.csv,.tsv,.txt"></label>
+      <label class="field" id="imp-sheet-field" hidden><span class="field__label">Feuille du classeur</span><select class="input" id="imp-sheet"></select></label>
+      <label class="field"><span class="field__label">… ou collez les lignes copiées depuis votre tableur</span><textarea class="input" id="imp-paste" rows="4" placeholder="Catégorie	Libellé	Montant	Récurrent?	Terminé"></textarea></label>
+      <label class="field"><span class="field__label">Les montants sont des</span><select class="input" id="imp-type"><option value="depense">Dépenses</option><option value="revenu">Revenus</option></select></label>
+      <label class="switch-row"><span class="switch-row__text">Créer les catégories inconnues<small>Sinon elles sont rangées dans « Autres »</small></span><span class="switch"><input type="checkbox" id="imp-create" checked><span></span></span></label>
+      <div id="imp-preview" class="card" style="background:var(--bg);box-shadow:none;margin-top:8px"><span class="small muted">Choisissez un fichier ou collez des lignes pour voir l'aperçu.</span></div>
+      <div id="imp-mode-field" class="field" hidden><span class="field__label">Ce mois contient déjà des opérations</span>
+        <select class="input" id="imp-mode"><option value="add">Ajouter aux opérations existantes</option><option value="replace">Remplacer les opérations du mois</option></select></div>
+      <label class="switch-row"><span class="switch-row__text">Marquer le mois comme clôturé</span><span class="switch"><input type="checkbox" id="imp-closed" checked><span></span></span></label>
+      <div class="btn-row"><button class="btn btn-ghost" data-action="close-sheet">Annuler</button><button class="btn" data-action="import-confirm" id="imp-go" disabled>Importer</button></div>`);
+    $('#imp-closed').checked = def < state.current;
+    updateImportPreview();
+  }
+
+  function pickSheetFor(monthKeyValue) {
+    const sel = $('#imp-sheet'); if (!sel || !imp.sheetNames.length) return;
+    const mName = MONTHS_FR[Number(monthKeyValue.slice(5, 7)) - 1];
+    const hit = imp.sheetNames.find((n) => norm(n) === mName) || imp.sheetNames.find((n) => norm(n).startsWith(mName));
+    if (hit) sel.value = hit;
+  }
+
+  function currentImportRows() {
+    const paste = $('#imp-paste').value;
+    if (paste.trim()) return parseDelimited(paste);
+    if (imp.wb) { const ws = imp.wb.Sheets[$('#imp-sheet').value]; return ws ? window.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' }) : null; }
+    return imp.rows;
+  }
+
+  function updateImportPreview() {
+    const box = $('#imp-preview'); if (!box) return;
+    const key = $('#imp-month').value;
+    const existing = key && state.months[key] && state.months[key].items.length;
+    $('#imp-mode-field').hidden = !existing;
+    const rows = currentImportRows();
+    if (!rows) { $('#imp-go').disabled = true; return; }
+    const res = rowsToItems(rows, { type: $('#imp-type').value, createCats: $('#imp-create').checked });
+    imp.result = res;
+    const out = res.items.filter((i) => i.type === 'depense'), inc = res.items.filter((i) => i.type === 'revenu');
+    const sum = (a) => a.reduce((t, i) => t + i.amount, 0);
+    box.innerHTML = res.items.length ? `<b>${res.items.length} opération${res.items.length > 1 ? 's' : ''} pour ${esc(key ? monthName(key) : '?')}</b>
+      <div class="small num" style="margin-top:4px">${out.length} dépense${out.length > 1 ? 's' : ''} : ${money(sum(out))}${inc.length ? ` · ${inc.length} revenu${inc.length > 1 ? 's' : ''} : ${money(sum(inc))}` : ''}</div>
+      ${res.newCats.length ? `<div class="small" style="margin-top:4px">Nouvelles catégories : ${res.newCats.map((c) => esc(c.name)).join(', ')}</div>` : ''}
+      ${res.skipped ? `<div class="small muted" style="margin-top:4px">${res.skipped} ligne${res.skipped > 1 ? 's' : ''} ignorée${res.skipped > 1 ? 's' : ''} (montant nul ou vide)</div>` : ''}
+      <ul class="small muted" style="margin:6px 0 0;padding-left:18px">${res.items.slice(0, 5).map((i) => `<li>${esc((res.newCats.find((c) => c.id === i.cat) || catById(i.cat)).name)} · ${esc(i.label)} · ${money(i.amount)}${i.recurring ? ' ↻' : ''}</li>`).join('')}${res.items.length > 5 ? '<li>…</li>' : ''}</ul>`
+      : `<span class="small neg">Aucune opération reconnue. Vérifiez que la feuille contient une colonne « Libellé » et une colonne « Montant ».</span>`;
+    $('#imp-go').disabled = !res.items.length || !key;
+  }
+
+  function commitImport() {
+    const key = $('#imp-month').value, res = imp.result;
+    if (!key || !res || !res.items.length) return;
+    const replace = !$('#imp-mode-field').hidden && $('#imp-mode').value === 'replace';
+    state.categories.push(...res.newCats);
+    const m = ensureMonth(key);
+    m.planned = false;
+    m.items = replace ? res.items : m.items.concat(res.items);
+    m.closed = $('#imp-closed').checked;
+    if (!state.months[state.current] || (key > state.current && !m.closed)) state.current = key;
+    save(); closeSheet();
+    ui.viewing = key; ui.tab = 'history'; render();
+    toast(`${res.items.length} opérations importées dans ${monthName(key)}`);
+  }
+
+  function openMonthMenu(key) {
+    const mm = state.months[key];
+    const canDelete = Object.keys(state.months).length > 1;
+    openSheet(`<h2 class="sheet__title" style="text-transform:capitalize">${esc(monthName(key))}<button class="sheet__close" data-action="close-sheet" aria-label="Fermer">✕</button></h2>
+      <p class="small muted">${mm.items.length} opération${mm.items.length > 1 ? 's' : ''} · reste ${money(monthStats(key).reste)}${mm.planned ? ' · mois prévisionnel' : ''}</p>
+      <div style="display:grid;gap:10px;margin-top:12px">
+        <button class="btn btn-ghost btn-block" data-action="goto" data-key="${key}">Ouvrir le mois</button>
+        ${mm.closed ? `<button class="btn btn-ghost btn-block" data-action="reopen" data-key="${key}">Rouvrir le mois</button>` : ''}
+        ${mm.planned ? `<button class="btn btn-ghost btn-block" data-action="refill-month" data-key="${key}">Re-remplir avec les récurrents actuels</button>` : ''}
+        <button class="btn btn-ghost btn-block" data-action="import-into" data-key="${key}">Importer des opérations dans ce mois</button>
+        ${canDelete ? `<button class="btn btn-danger btn-block" data-action="delete-month" data-key="${key}">Supprimer ce mois</button>` : ''}
+      </div>`);
+  }
+
   // ------------------------------------------------------------------ Toast
   let toastTimer;
   function toast(msg, actionLabel, onAction) {
@@ -622,13 +840,13 @@
     const el = e.target.closest('[data-action]');
     if (!el) { if (e.target === backdrop) closeSheet(); return; }
     const a = el.dataset.action;
-    const keys = Object.keys(state.months).sort();
+    const keys = visibleKeys();
     const m = state.months[ui.viewing];
 
     switch (a) {
       case 'prev-month': ui.viewing = keys[Math.max(0, keys.indexOf(ui.viewing) - 1)]; render(); break;
       case 'next-month': ui.viewing = keys[Math.min(keys.length - 1, keys.indexOf(ui.viewing) + 1)]; render(); break;
-      case 'goto': ui.viewing = el.dataset.key; ui.tab = 'home'; render(); window.scrollTo(0, 0); break;
+      case 'goto': if (!sheet.hidden) closeSheet(); ui.viewing = el.dataset.key; ui.tab = 'home'; render(); window.scrollTo(0, 0); break;
       case 'add': openItemSheet(null); break;
       case 'edit': openItemSheet(m.items.find((x) => x.id === el.dataset.id)); break;
       case 'toggle': {
@@ -667,9 +885,28 @@
           'Clôturer', () => { const nk = closeMonth(k); ui.viewing = nk; ui.tab = 'home'; render(); toast(`Bienvenue en ${monthName(nk)} !`); });
         break;
       }
-      case 'reopen': state.months[el.dataset.key].closed = false; save(); render(); toast('Mois rouvert'); break;
+      case 'reopen': state.months[el.dataset.key].closed = false; save(); closeSheet(); render(); toast('Mois rouvert'); break;
+      case 'month-menu': openMonthMenu(el.dataset.key); break;
+      case 'import-month': openImportSheet(); break;
+      case 'import-into': { const k = el.dataset.key; closeSheet(); openImportSheet(); $('#imp-month').value = k; $('#imp-closed').checked = k < state.current; updateImportPreview(); break; }
+      case 'import-confirm': commitImport(); break;
+      case 'refill-month': {
+        const k = el.dataset.key;
+        confirmSheet(`Re-remplir ${monthName(k)} ?`, `Les opérations de ce mois prévisionnel seront remplacées par les opérations récurrentes de ${esc(monthName(state.current))}.`, 'Re-remplir', () => {
+          state.months[k].items = recurringFor(state.current, k); save(); render(); toast('Mois re-rempli');
+        });
+        break;
+      }
+      case 'delete-month': {
+        const k = el.dataset.key; const n = state.months[k].items.length;
+        confirmSheet(`Supprimer ${monthName(k)} ?`, `Le mois et ses ${n} opération${n > 1 ? 's' : ''} seront supprimés de l'historique.${k === state.current ? ' C\'est le mois en cours : le mois précédent redeviendra le mois en cours.' : ''}`, 'Supprimer', () => {
+          const undo = deleteMonth(k); render();
+          toast(`${monthName(k)} supprimé`, 'Annuler', () => { undo(); render(); });
+        }, true);
+        break;
+      }
       case 'new-past-month': {
-        const first = keys[0]; const k = addMonths(first, -1);
+        const first = Object.keys(state.months).sort()[0]; const k = addMonths(first, -1);
         ensureMonth(k).closed = true; save(); ui.viewing = k; ui.tab = 'moves'; render();
         toast(`${monthName(k)} ajouté : saisissez ses opérations`); break;
       }
@@ -727,6 +964,7 @@
   // Saisie : suggestions de libellé -> pré-remplit catégorie et montant
   document.addEventListener('input', (e) => {
     const t = e.target;
+    if (t.id === 'imp-paste') { updateImportPreview(); return; }
     if (t.dataset.input === 'search') {
       ui.search = t.value; const pos = t.selectionStart; render();
       const s = $('[data-input="search"]'); s.focus(); s.setSelectionRange(pos, pos); return;
@@ -746,6 +984,26 @@
 
   document.addEventListener('change', (e) => {
     const t = e.target;
+    if (t.id === 'imp-file' && t.files[0]) {
+      const f = t.files[0]; const isText = /\.(csv|tsv|txt)$/i.test(f.name);
+      const box = $('#imp-preview');
+      if (isText) {
+        const rd = new FileReader();
+        rd.onload = () => { imp.wb = null; imp.rows = parseDelimited(String(rd.result)); $('#imp-sheet-field').hidden = true; updateImportPreview(); };
+        rd.readAsText(f);
+      } else {
+        box.innerHTML = '<span class="small muted">Lecture du classeur…</span>';
+        Promise.all([loadSheetJS(), f.arrayBuffer()]).then(([X, buf]) => {
+          imp.wb = X.read(buf, { type: 'array', cellDates: true }); imp.rows = null;
+          imp.sheetNames = imp.wb.SheetNames;
+          $('#imp-sheet').innerHTML = imp.sheetNames.map((n) => `<option>${esc(n)}</option>`).join('');
+          $('#imp-sheet-field').hidden = false; pickSheetFor($('#imp-month').value); updateImportPreview();
+        }).catch(() => { box.innerHTML = '<span class="small neg">Impossible de lire ce classeur (connexion nécessaire la première fois). Essayez l\'export .csv ou le copier-coller.</span>'; });
+      }
+      return;
+    }
+    if (t.id === 'imp-month') { $('#imp-closed').checked = t.value < state.current; pickSheetFor(t.value); updateImportPreview(); return; }
+    if (['imp-sheet', 'imp-type', 'imp-create', 'imp-mode'].includes(t.id)) { updateImportPreview(); return; }
     if (t.dataset.setting) { state.settings[t.dataset.setting] = t.checked; save(); render(); }
     else if (t.dataset.settingSel) { state.settings[t.dataset.settingSel] = t.value; fmtCache = {}; save(); render(); }
     else if (t.dataset.settingNum) {

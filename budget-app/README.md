@@ -13,11 +13,19 @@ Charte graphique aux couleurs du logo : vert anis `#9FBD39` et brun olive `#5147
   répartition par catégorie, budgets par catégorie, prévisions sur 6 mois.
 - **Opérations** : liste par catégorie, recherche, pointage d'un geste, modification/suppression (avec annulation).
 - **Historique** : clôture du mois (sauvegarde), création automatique du mois suivant avec les
-  opérations récurrentes et le report du solde, comparaison des mois, ajout de mois passés, réouverture.
+  opérations récurrentes et le report du solde, comparaison des mois, ajout de mois passés.
+  Menu « ⋯ » de chaque mois : ouvrir, rouvrir, importer des opérations, **supprimer** (avec annulation).
+- **Import d'un mois complet** : classeur Excel / Google Sheets (.xlsx, choix de la feuille — proposée
+  automatiquement d'après le nom du mois), fichier .csv ou lignes copiées-collées. Colonnes reconnues :
+  Catégorie (ou Origine), Libellé, Montant, Récurrent ?, Terminé, Date / Opération, Type.
+  Aperçu avant import, ajout ou remplacement, création des catégories inconnues.
+- **6 mois suivants** (option) : mois prévisionnels préremplis avec les opérations récurrentes,
+  consultables et modifiables ; masquer l'option les cache sans les effacer.
 - **Réglages** : jour de paye, report du solde, seuil d'alerte, devise, thème clair/sombre,
   catégories (nom, icône, couleur, budget mensuel), choix des blocs affichés,
   sauvegarde/restauration (JSON), export du mois en CSV (Excel / Google Sheets).
 - Fonctionne **hors-ligne** ; données stockées uniquement sur l'appareil.
+- Lecture des classeurs : [SheetJS](https://sheetjs.com) 0.18.5 (licence Apache-2.0), dans `vendor/`.
 
 ## Lancer / installer
 Servir le dossier `budget-app/` en HTTPS (GitHub Pages, Netlify…) ou en local :

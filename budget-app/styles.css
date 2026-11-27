@@ -145,6 +145,8 @@ button { cursor: pointer; }
 .segmented button { flex: 1; border: 0; background: transparent; border-radius: 10px; padding: 9px 6px; font-weight: 600; font-size: .9rem; color: var(--muted); }
 .segmented button.is-active { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
 .search { width: 100%; margin-top: 10px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); }
+.sortbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.sortbar .chip { padding: 5px 12px; }
 .totals-strip { display: flex; justify-content: space-between; font-size: .85rem; color: var(--muted); padding: 10px 4px 0; }
 
 .group { margin-top: 14px; }

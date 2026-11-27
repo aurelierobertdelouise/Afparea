@@ -36,7 +36,9 @@
     showDonut: true,
     showBudgets: true,
     showForecast: true,
-    showFuture: false,      // afficher les 6 mois suivants (prévisions modifiables)
+    showFuture: false,
+    sortBy: 'cat',          // classement des opérations : 'cat' ou 'date'
+    sortDir: 'desc',        // pour le classement par date : 'desc' (récentes d'abord) ou 'asc'      // afficher les 6 mois suivants (prévisions modifiables)
   };
 
   const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -409,6 +411,42 @@
       return html + `<div class="card empty" style="margin-top:14px"><div class="empty__ico">🧾</div><p>${q ? 'Aucun résultat.' : 'Rien ici pour le moment.'}</p>${q ? '' : '<button class="btn" data-action="add">Ajouter une opération</button>'}</div>`;
     }
 
+    const row = (it, showCat) => {
+      const c = catById(it.cat);
+      return `<div class="row ${it.done ? 'is-done' : ''}">
+          <button class="check ${it.done ? 'is-on' : ''}" data-action="toggle" data-id="${it.id}" aria-label="${it.done ? 'Dépointer' : 'Pointer'} ${esc(it.label)}" aria-pressed="${it.done}">✓</button>
+          <button class="row__main" data-action="edit" data-id="${it.id}">
+            <div class="row__title">${esc(it.label)}</div>
+            <div class="row__meta">${showCat ? `<span>${c.icon} ${esc(c.name)}</span>` : (it.date ? `<span>${fmtDate(it.date)}</span>` : '')}${it.recurring ? '<span class="pill">↻ récurrent</span>' : ''}${it.endMonth ? `<span class="pill">jusqu'à ${esc(monthName(it.endMonth, 'short'))} ${it.endMonth.slice(0, 4)}</span>` : ''}${it.note ? `<span>· ${esc(it.note)}</span>` : ''}</div>
+          </button>
+          <span class="row__amount num ${it.type === 'revenu' ? 'pos' : ''}">${it.type === 'revenu' ? '+' : '−'}${money(it.amount)}</span>
+        </div>`;
+    };
+    const byDate = state.settings.sortBy === 'date';
+    const asc = state.settings.sortDir === 'asc';
+    html += `<div class="sortbar"><span class="small muted">Classer par</span>
+      <button class="chip ${byDate ? '' : 'is-active'}" data-action="sort" data-sort="cat">Catégorie</button>
+      <button class="chip ${byDate ? 'is-active' : ''}" data-action="sort" data-sort="date" aria-label="Date${byDate ? (asc ? ', plus anciennes d\'abord' : ', plus récentes d\'abord') : ''}">Date ${byDate ? (asc ? '↑' : '↓') : ''}</button></div>`;
+
+    if (byDate) {
+      // Regroupement par jour d'opération ; les opérations sans date viennent à la fin.
+      const groups = {};
+      for (const it of items) (groups[it.date || ''] = groups[it.date || ''] || []).push(it);
+      const days = Object.keys(groups).filter(Boolean).sort();
+      if (!asc) days.reverse();
+      if (groups['']) days.push('');
+      for (const d of days) {
+        const list = groups[d].sort((a, b) => a.label.localeCompare(b.label, 'fr'));
+        const net = list.reduce((a, it) => a + (it.type === 'revenu' ? it.amount : -it.amount), 0);
+        let title = 'Sans date';
+        if (d) { const [y, mo, da] = d.split('-').map(Number); title = new Date(y, mo - 1, da).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: d.slice(0, 7) === ui.viewing ? undefined : 'numeric' }); title = title.charAt(0).toUpperCase() + title.slice(1); }
+        html += `<div class="group"><div class="group__head"><span>${esc(title)}</span><span class="sum num ${net < 0 ? 'muted' : 'pos'}">${net >= 0 ? '+' : ''}${money(net)}</span></div>
+          <div class="list">${list.map((it) => row(it, true)).join('')}</div></div>`;
+      }
+      if (groups[''] && groups[''].length === items.length) html += `<p class="small muted" style="text-align:center">Aucune opération de ce mois n'a de date. Ajoutez-la en touchant une opération.</p>`;
+      return html;
+    }
+
     // Regroupement par catégorie
     const groups = {};
     for (const it of items) (groups[it.cat] = groups[it.cat] || []).push(it);
@@ -422,14 +460,7 @@
       const sum = list.reduce((a, it) => a + it.amount, 0);
       html += `<div class="group"><div class="group__head"><span>${c.icon}</span><span>${esc(c.name)}</span><span class="sum num muted">${money(sum)}</span>
         ${c.budget > 0 ? `<span class="pill">budget ${money(c.budget, { short: true })}</span>` : ''}</div><div class="list">
-        ${list.map((it) => `<div class="row ${it.done ? 'is-done' : ''}">
-          <button class="check ${it.done ? 'is-on' : ''}" data-action="toggle" data-id="${it.id}" aria-label="${it.done ? 'Dépointer' : 'Pointer'} ${esc(it.label)}" aria-pressed="${it.done}">✓</button>
-          <button class="row__main" data-action="edit" data-id="${it.id}">
-            <div class="row__title">${esc(it.label)}</div>
-            <div class="row__meta">${it.date ? `<span>${fmtDate(it.date)}</span>` : ''}${it.recurring ? '<span class="pill">↻ récurrent</span>' : ''}${it.endMonth ? `<span class="pill">jusqu'à ${esc(monthName(it.endMonth, 'short'))} ${it.endMonth.slice(0, 4)}</span>` : ''}${it.note ? `<span>· ${esc(it.note)}</span>` : ''}</div>
-          </button>
-          <span class="row__amount num ${it.type === 'revenu' ? 'pos' : ''}">${it.type === 'revenu' ? '+' : '−'}${money(it.amount)}</span>
-        </div>`).join('')}</div></div>`;
+        ${list.map((it) => row(it, false)).join('')}</div></div>`;
     }
     return html;
   }
@@ -855,6 +886,11 @@
         break;
       }
       case 'filter': ui.filter = el.dataset.filter; render(); break;
+      case 'sort': {
+        const v = el.dataset.sort;
+        if (v === 'date' && state.settings.sortBy === 'date') state.settings.sortDir = state.settings.sortDir === 'asc' ? 'desc' : 'asc';
+        state.settings.sortBy = v; save(); render(); break;
+      }
       case 'close-sheet': closeSheet(); break;
       case 'set-type': {
         syncDraft(); draft.type = el.dataset.type;

@@ -11,7 +11,7 @@ Charte graphique aux couleurs du logo : vert anis `#9FBD39` et brun olive `#5147
 - **Accueil** : reste à vivre prévu, revenus/dépenses, solde réel (opérations pointées),
   reste à payer, « tu peux dépenser X € par jour » jusqu'à la prochaine paye, alertes,
   répartition par catégorie, budgets par catégorie, prévisions sur 6 mois.
-- **Opérations** : liste par catégorie, recherche, pointage d'un geste, modification/suppression (avec annulation).
+- **Opérations** : classement par catégorie ou par date d'opération (par jour, plus récentes ou plus anciennes d'abord), recherche, pointage d'un geste, modification/suppression (avec annulation).
 - **Historique** : clôture du mois (sauvegarde), création automatique du mois suivant avec les
   opérations récurrentes et le report du solde, comparaison des mois, ajout de mois passés.
   Menu « ⋯ » de chaque mois : ouvrir, rouvrir, importer des opérations, **supprimer** (avec annulation).

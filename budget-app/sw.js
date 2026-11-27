@@ -1,5 +1,5 @@
 // Service worker : permet l'utilisation hors-ligne de l'application.
-const CACHE = 'mon-budget-v2';
+const CACHE = 'mon-budget-v3';
 const ASSETS = [
   './', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest',
   'icons/logo.png', 'icons/icon-192.png', 'icons/icon-512.png',
